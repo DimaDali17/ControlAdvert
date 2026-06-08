@@ -370,18 +370,23 @@ function initDates(){
 
 /* ---------- networking ---------- */
 function proxyUrl(target){ return state.proxy.replace(/\/+$/,"") + "/" + target; }
-async function wb(target, {method="GET", body=null}={}){
+async function wb(target, {method="GET", body=null, _retries=3}={}){
   const headers = {};
   const t = state.token.trim();
   if(t) headers["Authorization"] = t;            // WB принимает «голый» токен
   if(body) headers["Content-Type"]="application/json";
   const res = await fetch(proxyUrl(target), { method, headers, body: body?JSON.stringify(body):undefined });
+  if(res.status===429){
+    if(_retries<=0) throw new Error("429 — rate limit. Подождите 1–2 минуты и попробуйте снова.");
+    const wait = Math.min(65, 20 * (4-_retries));  // 20с, 40с, 60с
+    await sleep(wait * 1000);
+    return wb(target, {method, body, _retries: _retries-1});
+  }
   const text = await res.text();
   if(!res.ok){
     let msg = text.slice(0,200);
     if(res.status===401) msg = "401 — токен недействителен или нет нужных категорий доступа.";
     if(res.status===403) msg = "403 — прокси отклонил хост или нет доступа.";
-    if(res.status===429) msg = "429 — слишком много запросов к WB, подождите минуту.";
     throw new Error(msg || ("HTTP "+res.status));
   }
   try{ return JSON.parse(text); }catch(e){ return text; }
@@ -458,19 +463,20 @@ async function runPipeline(){
     throw new Error("Не удалось получить названия кампаний через /api/advert/v2/adverts — связать рекламу с артикулами невозможно. Проверьте доступ токена к категории «Продвижение».");
   }
 
-  /* 3. ad fullstats (max 31 days per request, chunk ids by 40) */
+  /* 3. ad fullstats (max 31 days, max ~100 IDs per request, retry via wb()) */
   stepNow(2);
   const adByArtDate = new Map();   // "art|date" -> {views,clicks,adOrders,spend}
   const begin = state.from, end = state.to;
-  for(const part of chunk(advIds, 40)){
+  const fsChunks = chunk(advIds, 100);
+  for(let ci=0; ci<fsChunks.length; ci++){
+    const part = fsChunks[ci];
+    if(ci>0) await sleep(2000);  // 2 секунды между пачками — не раздражать rate limiter
     let stats;
     try{
       stats = await wb(WB_ADV + `/adv/v3/fullstats?ids=${part.join(",")}&beginDate=${begin}&endDate=${end}`);
-    }catch(e){ // если пачка падает — пробуем по одной, чтобы не терять всё
+    }catch(e){
+      // если пачка не прошла даже после retry в wb() — пропускаем, не спамим по одному
       stats = [];
-      for(const id of part){
-        try{ const s = await wb(WB_ADV + `/adv/v3/fullstats?ids=${id}&beginDate=${begin}&endDate=${end}`); if(s) stats.push(Array.isArray(s)?s[0]:s); await sleep(400);}catch(_){}
-      }
     }
     const arr = Array.isArray(stats) ? stats : (stats && Array.isArray(stats.data) ? stats.data : []);
     for(const camp of arr){
@@ -489,7 +495,6 @@ async function runPipeline(){
         adByArtDate.set(k,cur);
       }
     }
-    await sleep(350);
   }
 
   /* 4. real orders */
