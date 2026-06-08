@@ -362,8 +362,15 @@ function loadCfg(){
     if(c.sheetUrl) $("#sheet").value=c.sheetUrl;
     if(c.buyout) $("#buyout").value=c.buyout;
     if(c.incCancel) $("#incCancel").value="1";
-    $("#excl").value = (c.excl!=null) ? c.excl : "Pantal.SK.bejnew.02 | 42 44";
+    // Если сохранённое значение не содержит "|" — это старый формат, сбрасываем
+    const savedExcl = c.excl;
+    if(savedExcl!=null && savedExcl.includes("|")){
+      $("#excl").value = savedExcl;
+    } else {
+      $("#excl").value = "Pantal.SK.bejnew.02 | 42 44";
+    }
   }catch(e){ $("#excl").value="Pantal.SK.bejnew.02 | 42 44"; }
+}
 }
 
 /* ---------- defaults: period 20.05–03.06.2026 как на макете ---------- */
@@ -559,7 +566,7 @@ async function loadSheet(){
   catch(e){ throw new Error("Не удалось прочитать Google-таблицу — проверьте, что она опубликована (Файл → Поделиться → Опубликовать в интернете → CSV/TSV). " + e.message); }
   return parseTable(text);
 }
-function sizeNorm(s){ return norm(s).toLowerCase(); }
+function sizeNorm(s){ return norm(s).toLowerCase().replace(/\s+/g," "); }
 function parseTable(text){
   const firstLine = text.split("\n")[0]||"";
   const delim = firstLine.indexOf("\t")>=0 ? "\t" : ",";
