@@ -268,8 +268,8 @@ tfoot td.l{text-align:left}
   <div class="panel">
     <h3>Фильтры</h3>
     <div class="filters">
-      <div class="fgrp"><label class="label">Артикул</label><select id="fArt" class="fld"></select></div>
-      <div class="fgrp"><label class="label">Размер</label><select id="fSize" class="fld"></select></div>
+      <div class="fgrp"><label class="label">Выбор компании</label><select id="fArt" class="fld"></select></div>
+      
       <div class="fgrp"><label class="label">Период с</label><input id="fFrom" class="fld" type="date"></div>
       <div class="fgrp"><label class="label">Период по</label><input id="fTo" class="fld" type="date"></div>
       <button class="btn-ghost" id="resetFilters">Сбросить</button>
@@ -409,6 +409,11 @@ function dateOnly(s){ return (s||"").slice(0,10); }
 function* dayRange(from,to){ let d=new Date(from+"T00:00:00"); const e=new Date(to+"T00:00:00");
   while(d<=e){ yield d.toISOString().slice(0,10); d.setDate(d.getDate()+1); } }
 function norm(s){ return (s==null?"":String(s)).trim(); }
+function formatRuDate(s){
+  if(!s) return s;
+  const p=s.split("-");
+  return p.length===3 ? `${p[2]}.${p[1]}.${p[0]}` : s;
+}
 function keyArt(s){ return norm(s).toLowerCase(); }
 
 /* =======================================================================
@@ -755,7 +760,7 @@ function renderTable(rows){
     const paCls = pa>0?"posv":(pa<0?"neg":"zero");
     const noCost = !r.hasCost ? ` <span class="flagless" title="Нет себестоимости в таблице">●</span>` : "";
     return `<tr>
-      <td class="l">${r.date}</td>
+      <td class="l">${formatRuDate(r.date)}</td>
       <td class="l art-cell">${esc(r.article)}</td>
       <td class="l">${esc(r.size)}${r.excluded?' <span class="flagless" title="Исключён из распределения">∅</span>':''}</td>
       <td>${fmt.format(r.orders)}</td>
