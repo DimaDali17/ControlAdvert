@@ -268,8 +268,7 @@ tfoot td.l{text-align:left}
   <div class="panel">
     <h3>Фильтры</h3>
     <div class="filters">
-      <div class="fgrp"><label class="label">Артикул</label><select id="fArt" class="fld"></select></div>
-      <div class="fgrp"><label class="label">Размер</label><select id="fSize" class="fld"></select></div>
+      <div class="fgrp"><label class="label">Компания</label><select id="fArt" class="fld"></select></div>
       <div class="fgrp"><label class="label">Период с</label><input id="fFrom" class="fld" type="date"></div>
       <div class="fgrp"><label class="label">Период по</label><input id="fTo" class="fld" type="date"></div>
       <button class="btn-ghost" id="resetFilters">Сбросить</button>
@@ -286,7 +285,10 @@ tfoot td.l{text-align:left}
   </div>
 
   <div class="panel">
-    <h3>Детализация: день → артикул → размер</h3>
+    <h3 style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      Детализация
+      <button class="btn-ghost" id="toggleGroupBtn" style="font-size:13px;padding:7px 14px">По артикулам</button>
+    </h3>
     <div class="tablewrap">
       <table id="tbl">
         <thead><tr>
@@ -345,6 +347,7 @@ const WB_STAT = "https://statistics-api.wildberries.ru";
 
 const state = { token:"", proxy:"", from:"", to:"", sheetUrl:"", buyout:100, incCancel:false, exclusions:[], computed:null };
 const charts = {};
+let groupByArticle = false;
 
 /* ---------- persist config locally (это локальный файл, localStorage ок) ---------- */
 function saveCfg(){ try{ localStorage.setItem("ef_cfg", JSON.stringify({
@@ -358,8 +361,8 @@ function loadCfg(){
     if(c.sheetUrl) $("#sheet").value=c.sheetUrl;
     if(c.buyout) $("#buyout").value=c.buyout;
     if(c.incCancel) $("#incCancel").value="1";
-    $("#excl").value = (c.excl!=null) ? c.excl : "Pantal.SK.bejnew.02 | 40 42";
-  }catch(e){ $("#excl").value="Pantal.SK.bejnew.02 | 40 42"; }
+    $("#excl").value = (c.excl!=null) ? c.excl : "Pantal.SK.bejnew.02 | 42\nPantal.SK.bejnew.02 | 44";
+  }catch(e){ $("#excl").value="Pantal.SK.bejnew.02 | 42\nPantal.SK.bejnew.02 | 44"; }
 }
 
 /* ---------- defaults: period 20.05–03.06.2026 как на макете ---------- */
@@ -406,6 +409,7 @@ function renderLog(){ $("#loadlog").innerHTML = steps.map(s=>`<div class="step $
 /* ---------- date helpers ---------- */
 function ymd(d){ return d; }                       // already YYYY-MM-DD
 function dateOnly(s){ return (s||"").slice(0,10); }
+function fmtDate(s){ if(!s) return ""; const [y,m,d]=(s||"").slice(0,10).split("-"); return `${d}.${m}.${y}`; }
 function* dayRange(from,to){ let d=new Date(from+"T00:00:00"); const e=new Date(to+"T00:00:00");
   while(d<=e){ yield d.toISOString().slice(0,10); d.setDate(d.getDate()+1); } }
 function norm(s){ return (s==null?"":String(s)).trim(); }
@@ -562,15 +566,17 @@ function parseTable(text){
   const findCol = preds => head.findIndex(h=>preds.some(p=>h.includes(p)));
   const cArt = findCol(["supplierarticle","артикул продавца","артикул","article"]);
   const cProfit = findCol(["прибыль до рекл","прибыль до","profit","прибыль"]);
+  const cRevenue = findCol(["выручка","revenue","цена","price"]);
   const cBuy = findCol(["выкуп","buyout"]);
   const byArt={}, bySize={}; let hasBuyout=false;
   for(let i=1;i<rows.length;i++){
     const r = rows[i]; if(!r || cArt<0) continue;
     const raw = norm(r[cArt]); if(!raw) continue;
     const profit = cProfit>=0 ? parseNum(r[cProfit]) : 0;
+    const revenue = cRevenue>=0 ? parseNum(r[cRevenue]) : null;
     let buyout = null;
     if(cBuy>=0){ const b = parseNum(r[cBuy]); if(b!=null){ buyout = b>1.5 ? b/100 : b; hasBuyout=true; } }
-    const rec = {profit: profit||0, buyout};
+    const rec = {profit: profit||0, revenue, buyout};
     const semi = raw.indexOf(";");                       // "артикул;размер" — прибыль только для этого размера
     if(semi>=0){
       const art = keyArt(raw.slice(0,semi));
@@ -612,8 +618,9 @@ function combine(adByArtDate, ordByKey, sizesByArtDate, cost){
   // прибыль/выкупаемость: сначала ищем особый размер (артикул;размер), затем артикул целиком
   const sizeRec = (artL,size) => (cost && cost.bySize[artL] && cost.bySize[artL][sizeNorm(size)]) || null;
   const artRec  = artL => (cost && cost.byArt[artL]) || null;
-  const profitOf = (artL,size) => { const sr=sizeRec(artL,size); if(sr) return sr.profit||0; const ar=artRec(artL); return ar?(ar.profit||0):0; };
-  const buyoutOf = (artL,size) => { const sr=sizeRec(artL,size); if(sr&&sr.buyout!=null) return sr.buyout; const ar=artRec(artL); if(ar&&ar.buyout!=null) return ar.buyout; return state.buyout/100; };
+  const profitOf  = (artL,size) => { const sr=sizeRec(artL,size); if(sr) return sr.profit||0; const ar=artRec(artL); return ar?(ar.profit||0):0; };
+  const revenueOf = (artL,size) => { const sr=sizeRec(artL,size); if(sr&&sr.revenue!=null) return sr.revenue; const ar=artRec(artL); return ar&&ar.revenue!=null?ar.revenue:profitOf(artL,size); };
+  const buyoutOf  = (artL,size) => { const sr=sizeRec(artL,size); if(sr&&sr.buyout!=null) return sr.buyout; const ar=artRec(artL); if(ar&&ar.buyout!=null) return ar.buyout; return state.buyout/100; };
   const hasCost  = (artL,size) => !!(sizeRec(artL,size) || artRec(artL));
 
   // union of (art,date) pairs from ads + orders
@@ -642,7 +649,7 @@ function combine(adByArtDate, ordByKey, sizesByArtDate, cost){
     if(!sizes.length){
       // расход есть, заказов нет
       if(spend>0 || adm.views>0){
-        rows.push(mkRow(date,artName,artL,"—",0,spend,adm,ctr,cr,profitOf,buyoutOf,hasCost,false));
+        rows.push(mkRow(date,artName,artL,"—",0,spend,adm,ctr,cr,profitOf,revenueOf,buyoutOf,hasCost,false));
       }
       continue;
     }
@@ -652,24 +659,24 @@ function combine(adByArtDate, ordByKey, sizesByArtDate, cost){
       const isEx = exSet.has(sizeNorm(s));
       let sSpend = isEx ? 0 : perSize;
       if(eligible.length===0) sSpend = 0;
-      rows.push(mkRow(date,artName,artL,s,cnt,sSpend,adm,ctr,cr,profitOf,buyoutOf,hasCost,isEx));
+      rows.push(mkRow(date,artName,artL,s,cnt,sSpend,adm,ctr,cr,profitOf,revenueOf,buyoutOf,hasCost,isEx));
     }
     if(eligible.length===0 && spend>0){
       // все размеры исключены — расход некуда распределить, выносим отдельной строкой
-      rows.push(mkRow(date,artName,artL,"(не распределено)",0,spend,adm,ctr,cr,profitOf,buyoutOf,hasCost,false));
+      rows.push(mkRow(date,artName,artL,"(не распределено)",0,spend,adm,ctr,cr,profitOf,revenueOf,buyoutOf,hasCost,false));
     }
   }
   rows.sort((a,b)=> a.date<b.date?-1:a.date>b.date?1:(a.article<b.article?-1:a.article>b.article?1:(a.size<b.size?-1:1)));
   return { rows, adByArtDate };
 }
-function mkRow(date,article,artL,size,orders,spend,adm,ctr,cr,profitOf,buyoutOf,hasCost,excluded){
-  const pu = profitOf(artL,size), bo = buyoutOf(artL,size);
-  const profitBefore = orders * bo * pu;            // = ожидаемая прибыль (с выкупаемостью)
+function mkRow(date,article,artL,size,orders,spend,adm,ctr,cr,profitOf,revenueOf,buyoutOf,hasCost,excluded){
+  const pu = profitOf(artL,size), bo = buyoutOf(artL,size), ru = revenueOf(artL,size);
+  const profitBefore = orders * bo * pu;
   const profitAfter = profitBefore - spend;
   return {
     date, article, artL, size, orders,
     spend, views: adm.views||0, clicks: adm.clicks||0, ctr, cr,
-    profitBefore, profitAfter, buyout:bo, profitUnit:pu, hasCost:hasCost(artL,size), excluded
+    profitBefore, profitAfter, buyout:bo, profitUnit:pu, revenueUnit:ru, hasCost:hasCost(artL,size), excluded
   };
 }
 
@@ -682,23 +689,17 @@ const pct = v => (v||0).toFixed(2).replace(".",",") + "%";
 
 function buildFilters(){
   const arts = [...new Set(state.computed.rows.map(r=>r.article))].sort();
-  $("#fArt").innerHTML = `<option value="">Все артикулы</option>` + arts.map(a=>`<option>${esc(a)}</option>`).join("");
+  $("#fArt").innerHTML = `<option value="">Все компании</option>` + arts.map(a=>`<option>${esc(a)}</option>`).join("");
   $("#fFrom").value = state.from; $("#fTo").value = state.to;
-  refreshSizeOptions();
 }
-function refreshSizeOptions(){
-  const art = $("#fArt").value;
-  const pool = state.computed.rows.filter(r=>!art||r.article===art);
-  const sizes = [...new Set(pool.map(r=>r.size))].sort();
-  $("#fSize").innerHTML = `<option value="">Все размеры</option>` + sizes.map(s=>`<option>${esc(s)}</option>`).join("");
-}
+function refreshSizeOptions(){ /* не используется — фильтр размера убран */ }
 function currentFilter(){
-  return { art:$("#fArt").value, size:$("#fSize").value, from:$("#fFrom").value, to:$("#fTo").value };
+  return { art:$("#fArt").value, from:$("#fFrom").value, to:$("#fTo").value };
 }
 function filteredRows(){
   const f = currentFilter();
   return state.computed.rows.filter(r=>
-    (!f.art||r.article===f.art) && (!f.size||r.size===f.size) &&
+    (!f.art||r.article===f.art) &&
     r.date>=f.from && r.date<=f.to);
 }
 // ad-level rows (для показов/кликов/CTR/CR — без учёта фильтра размера)
@@ -727,12 +728,14 @@ function renderKpis(rows, ad){
   const spend = rows.reduce((s,r)=>s+r.spend,0);
   const pB = rows.reduce((s,r)=>s+r.profitBefore,0);
   const pA = rows.reduce((s,r)=>s+r.profitAfter,0);
+  const revenue = rows.reduce((s,r)=>s+(r.orders * r.buyout * (r.revenueUnit||r.profitUnit||0)),0);
   const views = ad.reduce((s,r)=>s+r.views,0);
   const clicks = ad.reduce((s,r)=>s+r.clicks,0);
   const ctr = views?clicks/views*100:0;
   const adOrders = ad.reduce((s,r)=>s+r.adOrders,0);
   const cr = clicks?adOrders/clicks*100:0;
-  const drr = pB>0 ? spend/(pB)*100 : 0;
+  const drrProfit = pB>0 ? spend/pB*100 : 0;
+  const drrRevenue = revenue>0 ? spend/revenue*100 : 0;
   const m = state.computed.meta;
   const k = [
     ["Заказы (реальные)", fmt.format(orders), `${m.ordersTotal} в выгрузке`, ""],
@@ -740,7 +743,8 @@ function renderKpis(rows, ad){
     ["Прибыль до рекламы", money(pB), "с учётом выкупаемости", ""],
     ["Прибыль после рекламы", money(pA), pA>=0?"реклама окупается":"реклама в минус", "profit"],
     ["CTR / CR", pct(ctr)+" / "+pct(cr), `${fmt.format(views)} показов`, ""],
-    ["ДРР по прибыли", pB>0?pct(drr):"—", "расход ÷ прибыль до", "accent"],
+    ["ДРР по прибыли", pB>0?pct(drrProfit):"—", "расход ÷ прибыль до", "accent"],
+    ["ДРР по выручке", revenue>0?pct(drrRevenue):"—", "расход ÷ выручка", "accent"],
   ];
   $("#kpis").innerHTML = k.map(([l,v,s,cls])=>`
     <div class="kpi ${cls}"><div class="bar"></div>
@@ -749,15 +753,32 @@ function renderKpis(rows, ad){
 
 function renderTable(rows){
   const tb = $("#tbody");
+  const sizeThEl = document.querySelector("#tbl thead th[data-k='size']");
+  if(sizeThEl) sizeThEl.style.display = groupByArticle ? "none" : "";
+
   if(!rows.length){ tb.innerHTML = `<tr><td class="l" colspan="11" style="padding:24px;color:var(--muted)">Нет данных за выбранные фильтры.</td></tr>`; $("#tfoot").innerHTML=""; return; }
-  tb.innerHTML = rows.map(r=>{
+
+  let displayRows = rows;
+  if(groupByArticle){
+    const map = {};
+    for(const r of rows){
+      const k = r.date+"|"+r.artL;
+      if(!map[k]) map[k]={...r,orders:0,spend:0,profitBefore:0,profitAfter:0};
+      map[k].orders+=r.orders; map[k].spend+=r.spend;
+      map[k].profitBefore+=r.profitBefore; map[k].profitAfter+=r.profitAfter;
+    }
+    displayRows=Object.values(map).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(a.article<b.article?-1:1));
+  }
+
+  tb.innerHTML = displayRows.map(r=>{
     const pa = r.profitAfter;
     const paCls = pa>0?"posv":(pa<0?"neg":"zero");
     const noCost = !r.hasCost ? ` <span class="flagless" title="Нет себестоимости в таблице">●</span>` : "";
+    const sizeCell = groupByArticle ? "" : `<td class="l">${esc(r.size)}${r.excluded?' <span class="flagless" title="Исключён из распределения">∅</span>':''}</td>`;
     return `<tr>
-      <td class="l">${r.date}</td>
+      <td class="l">${fmtDate(r.date)}</td>
       <td class="l art-cell">${esc(r.article)}</td>
-      <td class="l">${esc(r.size)}${r.excluded?' <span class="flagless" title="Исключён из распределения">∅</span>':''}</td>
+      ${sizeCell}
       <td>${fmt.format(r.orders)}</td>
       <td>${r.spend?money(r.spend):'<span class="zero">0 ₽</span>'}</td>
       <td>${r.views?fmt.format(r.views):'<span class="zero">0</span>'}</td>
@@ -768,9 +789,10 @@ function renderTable(rows){
       <td class="${paCls}">${money(pa)}</td>
     </tr>`;
   }).join("");
-  const sum = rows.reduce((a,r)=>{ a.o+=r.orders;a.s+=r.spend;a.v+=r.views;a.c+=r.clicks;a.pb+=r.profitBefore;a.pa+=r.profitAfter; return a; },{o:0,s:0,v:0,c:0,pb:0,pa:0});
+  const sum = displayRows.reduce((a,r)=>{ a.o+=r.orders;a.s+=r.spend;a.v+=r.views;a.c+=r.clicks;a.pb+=r.profitBefore;a.pa+=r.profitAfter; return a; },{o:0,s:0,v:0,c:0,pb:0,pa:0});
+  const colspan = groupByArticle ? 2 : 3;
   $("#tfoot").innerHTML = `<tr>
-    <td class="l" colspan="3">Итого · ${rows.length} строк</td>
+    <td class="l" colspan="${colspan}">Итого · ${displayRows.length} строк</td>
     <td>${fmt.format(sum.o)}</td><td>${money(sum.s)}</td>
     <td>${fmt.format(sum.v)}</td><td>${fmt.format(sum.c)}</td>
     <td>${pct(sum.v?sum.c/sum.v*100:0)}</td><td></td>
@@ -797,7 +819,7 @@ const baseOpts = (extra={}) => ({ responsive:true, maintainAspectRatio:false,
 
 function renderCharts(rows, ad){
   const d = byDay(rows, ad);
-  const lbl = d.days.map(x=>x.slice(5));
+  const lbl = d.days.map(x=>{ const [y,m,day]=x.split("-"); return `${day}.${m}`; });
   mkChart("cOrdersSpend",{ type:'bar',
     data:{labels:lbl,datasets:[
       {type:'bar',label:'Заказы',data:d.get('orders'),backgroundColor:'rgba(58,125,131,.55)',borderRadius:5,yAxisID:'y'},
@@ -861,7 +883,7 @@ async function go(){
     await sleep(250);
     $("#config").classList.add("hidden");
     $("#dash").classList.remove("hidden");
-    $("#periodChip").textContent = `${state.from} → ${state.to}`;
+    $("#periodChip").textContent = `${fmtDate(state.from)} → ${fmtDate(state.to)}`;
     buildFilters();
     render();
   }catch(e){
@@ -873,13 +895,13 @@ async function go(){
 }
 
 $("#load").addEventListener("click", go);
+document.addEventListener("click", e=>{ if(e.target.id==="toggleGroupBtn"){ groupByArticle=!groupByArticle; e.target.textContent=groupByArticle?"По размерам":"По артикулам"; render(); } });
 $("#reloadBtn").addEventListener("click", async ()=>{ $("#loader").classList.add("on"); try{ state.computed=await runPipeline(); buildFilters(); render(); }catch(e){ alert("Ошибка: "+e.message); } finally{ $("#loader").classList.remove("on"); }});
 $("#backBtn").addEventListener("click", ()=>{ $("#dash").classList.add("hidden"); $("#config").classList.remove("hidden"); });
-$("#fArt").addEventListener("change", ()=>{ refreshSizeOptions(); render(); });
-$("#fSize").addEventListener("change", render);
+$("#fArt").addEventListener("change", render);
 $("#fFrom").addEventListener("change", render);
 $("#fTo").addEventListener("change", render);
-$("#resetFilters").addEventListener("click", ()=>{ $("#fArt").value="";$("#fSize").value="";$("#fFrom").value=state.from;$("#fTo").value=state.to; refreshSizeOptions(); render(); });
+$("#resetFilters").addEventListener("click", ()=>{ $("#fArt").value="";$("#fFrom").value=state.from;$("#fTo").value=state.to; render(); });
 
 /* proxy help modal */
 $("#openProxyHelp").addEventListener("click", e=>{ e.preventDefault(); $("#proxyHelp").classList.remove("hidden"); });
