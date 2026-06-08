@@ -285,6 +285,30 @@ tfoot td.l{text-align:left}
   </div>
 
   <div class="panel">
+    <h3>Сводка по компаниям</h3>
+    <div class="tablewrap">
+      <table id="tblSum">
+        <thead><tr>
+          <th class="l" data-k="article">Компания</th>
+          <th data-k="orders">Заказы</th>
+          <th data-k="ordRevenue">Выручка</th>
+          <th data-k="spend">Расход рекл.</th>
+          <th data-k="views">Показы</th>
+          <th data-k="clicks">Клики</th>
+          <th data-k="ctr">CTR</th>
+          <th data-k="cr">CR</th>
+          <th data-k="profitBefore">Прибыль до рекл.</th>
+          <th data-k="profitAfter">Прибыль после рекл.</th>
+          <th data-k="drrP">ДРР прибыль</th>
+          <th data-k="drrR">ДРР выручка</th>
+        </tr></thead>
+        <tbody id="tbodySum"></tbody>
+        <tfoot id="tfootSum"></tfoot>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
     <h3 style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
       Детализация
       <button class="btn-ghost" id="toggleGroupBtn" style="font-size:13px;padding:7px 14px">По артикулам</button>
@@ -739,8 +763,60 @@ function render(){
   const rows = filteredRows();
   const ad = filteredAd();
   renderKpis(rows, ad);
+  renderSummary(rows);
   renderTable(rows);
   renderCharts(rows, ad);
+}
+
+function renderSummary(rows){
+  const map = {};
+  for(const r of rows){
+    const k = r.artL;
+    if(!map[k]) map[k]={article:r.article,orders:0,ordRevenue:0,spend:0,views:0,clicks:0,adOrders:0,profitBefore:0,profitAfter:0};
+    map[k].orders       += r.orders;
+    map[k].ordRevenue   += r.ordRevenue||0;
+    map[k].spend        += r.spend;
+    map[k].views        += r.views;
+    map[k].clicks       += r.clicks;
+    map[k].profitBefore += r.profitBefore;
+    map[k].profitAfter  += r.profitAfter;
+  }
+  const sumRows = Object.values(map).sort((a,b)=>b.profitAfter-a.profitAfter);
+  const tb = $("#tbodySum");
+  if(!sumRows.length){ tb.innerHTML=`<tr><td colspan="12" style="padding:20px;color:var(--muted)">Нет данных.</td></tr>`; $("#tfootSum").innerHTML=""; return; }
+  tb.innerHTML = sumRows.map(r=>{
+    const pa=r.profitAfter, paCls=pa>0?"posv":(pa<0?"neg":"zero");
+    const ctr=r.views?r.clicks/r.views*100:0;
+    const cr=r.clicks?0:0; // adOrders не суммируем на этом уровне
+    const drrP=r.profitBefore>0?r.spend/r.profitBefore*100:null;
+    const drrR=r.ordRevenue>0?r.spend/r.ordRevenue*100:null;
+    return `<tr>
+      <td class="l art-cell">${esc(r.article)}</td>
+      <td>${fmt.format(r.orders)}</td>
+      <td>${r.ordRevenue?money(r.ordRevenue):'<span class="zero">0 ₽</span>'}</td>
+      <td>${r.spend?money(r.spend):'<span class="zero">0 ₽</span>'}</td>
+      <td>${fmt.format(Math.round(r.views))}</td>
+      <td>${fmt.format(Math.round(r.clicks))}</td>
+      <td>${pct(ctr)}</td>
+      <td>—</td>
+      <td>${money(r.profitBefore)}</td>
+      <td class="${paCls}">${money(pa)}</td>
+      <td>${drrP!=null?pct(drrP):'<span class="zero">—</span>'}</td>
+      <td>${drrR!=null?pct(drrR):'<span class="zero">—</span>'}</td>
+    </tr>`;
+  }).join("");
+  const s = sumRows.reduce((a,r)=>{ a.o+=r.orders;a.rv+=r.ordRevenue;a.sp+=r.spend;a.v+=r.views;a.c+=r.clicks;a.pb+=r.profitBefore;a.pa+=r.profitAfter; return a; },{o:0,rv:0,sp:0,v:0,c:0,pb:0,pa:0});
+  const drrPT=s.pb>0?s.sp/s.pb*100:null, drrRT=s.rv>0?s.sp/s.rv*100:null;
+  $("#tfootSum").innerHTML=`<tr>
+    <td class="l">Итого · ${sumRows.length} компаний</td>
+    <td>${fmt.format(s.o)}</td><td>${money(s.rv)}</td><td>${money(s.sp)}</td>
+    <td>${fmt.format(Math.round(s.v))}</td><td>${fmt.format(Math.round(s.c))}</td>
+    <td>${pct(s.v?s.c/s.v*100:0)}</td><td></td>
+    <td>${money(s.pb)}</td>
+    <td class="${s.pa>=0?'posv':'neg'}">${money(s.pa)}</td>
+    <td>${drrPT!=null?pct(drrPT):'—'}</td>
+    <td>${drrRT!=null?pct(drrRT):'—'}</td>
+  </tr>`;
 }
 
 function renderKpis(rows, ad){
