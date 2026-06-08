@@ -417,30 +417,50 @@ async function runPipeline(){
     "Связываю данные по supplierArticle и считаю прибыль",
   ]);
 
-  /* 1. campaigns list */
+  /* 1-2. campaigns + names.
+     Метод /adv/v1/promotion/adverts поддерживает GET (query-параметры → кампании с именами)
+     и POST (по списку ID). У части кабинетов/прокси POST даёт 404, поэтому GET — основной. */
   stepNow(0);
-  const count = await wb(WB_ADV + "/adv/v1/promotion/count");
+  const nameById = {};
   let advIds = [];
-  if(count && Array.isArray(count.adverts)){
-    for(const grp of count.adverts){
-      const list = grp.advert_list || grp.advertList || [];
-      for(const a of list) if(a.advertId!=null) advIds.push(a.advertId);
+
+  // A) GET /adv/v1/promotion/adverts — сразу отдаёт кампании с названиями
+  try{
+    const arr = await wb(WB_ADV + "/adv/v1/promotion/adverts?order=change&direction=desc");
+    if(Array.isArray(arr) && arr.length){
+      for(const c of arr) if(c && c.advertId!=null){ nameById[c.advertId]=norm(c.name); advIds.push(c.advertId); }
+    }
+  }catch(e){ /* перейдём к плану B */ }
+
+  // B) если GET ничего не дал — count (список ID) + POST adverts (имена по ID)
+  if(!advIds.length){
+    const count = await wb(WB_ADV + "/adv/v1/promotion/count");
+    if(count && Array.isArray(count.adverts)){
+      for(const grp of count.adverts){
+        const list = grp.advert_list || grp.advertList || [];
+        for(const a of list) if(a.advertId!=null) advIds.push(a.advertId);
+      }
+    }
+    advIds = [...new Set(advIds)];
+    if(!advIds.length) throw new Error("В кабинете не найдено рекламных кампаний (методы /promotion/adverts и /promotion/count вернули пусто). Проверьте, что у токена есть категория «Продвижение».");
+    stepNow(1);
+    for(const part of chunk(advIds, 50)){
+      try{
+        const info = await wb(WB_ADV + "/adv/v1/promotion/adverts", {method:"POST", body:part});
+        if(Array.isArray(info)) for(const c of info){ if(c.advertId!=null) nameById[c.advertId] = norm(c.name); }
+      }catch(e){ /* имена не критичны для fullstats, продолжаем */ }
+      await sleep(120);
     }
   }
   advIds = [...new Set(advIds)];
-  if(!advIds.length) throw new Error("В кабинете не найдено рекламных кампаний.");
-
-  /* 2. campaign names -> article map */
   stepNow(1);
-  const nameById = {};
-  for(const part of chunk(advIds, 50)){
-    const info = await wb(WB_ADV + "/adv/v1/promotion/adverts", {method:"POST", body:part});
-    if(Array.isArray(info)) for(const c of info){ if(c.advertId!=null) nameById[c.advertId] = norm(c.name); }
-    await sleep(120);
-  }
+
   // article -> [advertId]; advertId -> article (article = campaign name)
   const articleOfAdv = {};
   for(const id of advIds){ const nm = nameById[id]; if(nm) articleOfAdv[id] = nm; }
+  if(!Object.keys(articleOfAdv).length){
+    throw new Error("Не удалось получить названия кампаний — связать рекламу с артикулами невозможно. Убедитесь, что токен имеет доступ к категории «Продвижение».");
+  }
 
   /* 3. ad fullstats (max 31 days per request, chunk ids by 40) */
   stepNow(2);
