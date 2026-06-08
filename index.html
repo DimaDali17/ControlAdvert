@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EasyForm · Аналитика рекламы Wildberries</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg1:#efe9df; --bg2:#f6f2ea; --bg3:#e7ddd0;
+  --card:#fbf8f2; --card2:#fdfbf6;
+  --ink:#2c2722; --ink2:#4a4339; --muted:#9b9184; --faint:#bcb3a4;
+  --line:#ece6da; --line2:#e2daccc;
+  --token:#e2eaf6; --tokenline:#c9d6ee;
+  --pill:#e7ede4; --green:#4f7a52; --greendot:#5c9460;
+  --gold:#b3955f; --gold2:#9c7f4b;
+  --terra:#c47150; --sage:#6f8f6a; --teal:#3a7d83; --rust:#b8553f;
+  --radius:26px; --radius-s:14px;
+  --shadow:0 30px 60px -28px rgba(70,56,40,.40), 0 8px 22px -14px rgba(70,56,40,.25);
+  --shadow-s:0 14px 30px -18px rgba(70,56,40,.35);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:'Manrope',sans-serif; color:var(--ink);
+  background:
+    radial-gradient(1200px 700px at 12% -8%, #fff8ee 0%, transparent 55%),
+    radial-gradient(1000px 800px at 108% 12%, #efe6d8 0%, transparent 50%),
+    linear-gradient(155deg,var(--bg2),var(--bg1) 55%,var(--bg3));
+  min-height:100vh; -webkit-font-smoothing:antialiased;
+}
+.brandfont{font-family:'Comfortaa',cursive}
+button{font-family:inherit;cursor:pointer}
+input,select{font-family:inherit}
+a{color:var(--gold2);text-decoration:none;border-bottom:1px dotted var(--gold)}
+a:hover{color:var(--gold)}
+.hidden{display:none!important}
+
+/* ---------- shared bits ---------- */
+.logo{
+  width:64px;height:64px;border-radius:18px;flex:0 0 auto;
+  background:linear-gradient(145deg,#3a332b,#15110d);
+  display:grid;place-items:center;color:#f3ede1;font-weight:700;
+  box-shadow:0 10px 24px -12px rgba(40,30,15,.7), inset 0 1px 0 rgba(255,255,255,.08);
+  position:relative;overflow:hidden;
+}
+.logo span{font-family:'Comfortaa';font-size:26px;letter-spacing:-1px;
+  background:linear-gradient(180deg,#fff,#cdbfa6);-webkit-background-clip:text;background-clip:text;color:transparent}
+.logo:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 30% 20%,rgba(255,255,255,.18),transparent 60%)}
+.label{font-size:11.5px;font-weight:700;letter-spacing:.13em;color:var(--muted);text-transform:uppercase;margin-bottom:8px;display:block}
+.pill{
+  display:inline-flex;align-items:center;gap:9px;background:var(--pill);
+  color:var(--green);font-weight:600;font-size:13.5px;padding:11px 16px;border-radius:13px;width:100%;
+}
+.pill .dot{width:9px;height:9px;border-radius:50%;background:var(--greendot);box-shadow:0 0 0 4px rgba(92,148,96,.18)}
+.pill.warn{background:#f3e7df;color:#a85a3a}
+.pill.warn .dot{background:#cf7a52;box-shadow:0 0 0 4px rgba(207,122,82,.18)}
+.fld{
+  width:100%;border:1.5px solid var(--line2);background:var(--card2);border-radius:var(--radius-s);
+  padding:13px 16px;font-size:15px;color:var(--ink);transition:.15s;outline:none;
+}
+.fld::placeholder{color:var(--faint)}
+.fld:focus{border-color:var(--gold);box-shadow:0 0 0 4px rgba(179,149,95,.13)}
+.fld.token{background:var(--token);border-color:var(--tokenline)}
+.fld.token:focus{box-shadow:0 0 0 4px rgba(120,150,200,.16)}
+.btn-primary{
+  width:100%;border:none;border-radius:16px;padding:17px;font-size:16px;font-weight:600;
+  font-family:'Comfortaa';color:#f6f0e4;background:linear-gradient(145deg,#332c24,#1a160f);
+  box-shadow:0 16px 30px -16px rgba(40,30,15,.7), inset 0 1px 0 rgba(255,255,255,.07);
+  transition:.15s;letter-spacing:.01em;
+}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 22px 36px -16px rgba(40,30,15,.75)}
+.btn-primary:active{transform:translateY(0)}
+.btn-primary:disabled{opacity:.55;cursor:not-allowed;transform:none}
+.btn-ghost{
+  border:1.5px solid var(--line2);background:var(--card2);color:var(--ink2);border-radius:12px;
+  padding:10px 16px;font-weight:600;font-size:14px;transition:.15s;
+}
+.btn-ghost:hover{border-color:var(--gold);color:var(--ink)}
+
+/* ---------- config screen ---------- */
+#config{min-height:100vh;display:grid;place-items:center;padding:32px 18px}
+.card{
+  width:100%;max-width:620px;background:var(--card);border-radius:var(--radius);
+  padding:38px 40px 34px;box-shadow:var(--shadow);border:1px solid rgba(255,255,255,.6);
+}
+.head{display:flex;align-items:center;gap:18px;margin-bottom:26px}
+.head h1{font-family:'Comfortaa';font-size:34px;margin:0;font-weight:700;letter-spacing:-.5px}
+.head .sub{font-size:11.5px;font-weight:700;letter-spacing:.16em;color:var(--muted);text-transform:uppercase;margin-top:5px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.mt{margin-top:20px}
+.mt-s{margin-top:14px}
+.hint{font-size:12.5px;color:var(--muted);margin-top:7px}
+details.adv{margin-top:22px;border-top:1px solid var(--line);padding-top:18px}
+details.adv summary{font-family:'Comfortaa';font-weight:600;font-size:15px;color:var(--ink2);cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px}
+details.adv summary::-webkit-details-marker{display:none}
+details.adv summary .chev{transition:.2s;color:var(--muted)}
+details.adv[open] summary .chev{transform:rotate(90deg)}
+.adv-body{padding-top:16px;display:flex;flex-direction:column;gap:16px}
+textarea.fld{resize:vertical;min-height:64px;font-family:'Manrope';font-size:13.5px;line-height:1.5}
+.err{background:#f6e2db;color:#a8452e;border-radius:12px;padding:12px 15px;font-size:13.5px;font-weight:500;margin-top:16px}
+
+/* ---------- modal ---------- */
+.modal-bg{position:fixed;inset:0;background:rgba(44,39,34,.45);backdrop-filter:blur(3px);display:grid;place-items:center;z-index:50;padding:24px}
+.modal{background:var(--card);border-radius:22px;max-width:680px;width:100%;max-height:86vh;overflow:auto;padding:30px 32px;box-shadow:var(--shadow)}
+.modal h2{font-family:'Comfortaa';font-size:24px;margin:0 0 4px}
+.modal p{color:var(--ink2);font-size:14px;line-height:1.6}
+.modal ol{color:var(--ink2);font-size:14px;line-height:1.7;padding-left:20px}
+pre{background:#2a241d;color:#e8e0d0;border-radius:14px;padding:16px;overflow:auto;font-size:12px;line-height:1.5;font-family:ui-monospace,Menlo,monospace}
+.modal-x{float:right;border:none;background:var(--line);width:34px;height:34px;border-radius:10px;font-size:18px;color:var(--ink2)}
+
+/* ---------- dashboard ---------- */
+#dash{padding:26px clamp(16px,4vw,46px) 60px;max-width:1500px;margin:0 auto}
+.topbar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+.topbar .logo{width:50px;height:50px;border-radius:14px}
+.topbar .logo span{font-size:20px}
+.topbar h1{font-family:'Comfortaa';font-size:24px;margin:0;font-weight:700}
+.topbar .sub{font-size:10.5px;letter-spacing:.16em;color:var(--muted);font-weight:700;text-transform:uppercase}
+.topbar .spacer{flex:1}
+.period-chip{background:var(--card);border:1px solid var(--line2);border-radius:12px;padding:9px 15px;font-size:13px;font-weight:600;color:var(--ink2);box-shadow:var(--shadow-s)}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:22px}
+.kpi{background:var(--card);border-radius:18px;padding:18px 20px;box-shadow:var(--shadow-s);border:1px solid rgba(255,255,255,.6);position:relative;overflow:hidden}
+.kpi .k-l{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.kpi .k-v{font-size:26px;font-weight:800;margin-top:8px;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+.kpi .k-s{font-size:12px;color:var(--muted);margin-top:3px;font-weight:600}
+.kpi.accent .k-v{color:var(--terra)}
+.kpi.pos .k-v{color:var(--sage)}
+.kpi .bar{position:absolute;left:0;top:0;bottom:0;width:5px}
+.kpi.accent .bar{background:var(--terra)} .kpi.pos .bar{background:var(--sage)}
+.kpi.profit .bar{background:var(--teal)} .kpi.profit .k-v{color:var(--teal)}
+
+.panel{background:var(--card);border-radius:20px;padding:22px 24px;box-shadow:var(--shadow-s);border:1px solid rgba(255,255,255,.6);margin-bottom:20px}
+.panel h3{font-family:'Comfortaa';font-size:17px;margin:0 0 16px;font-weight:600}
+.filters{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end}
+.filters .fgrp{display:flex;flex-direction:column;gap:6px}
+.filters .fgrp .label{margin:0}
+.filters select,.filters input{min-width:150px}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:18px}
+.chartbox{background:var(--card2);border:1px solid var(--line);border-radius:16px;padding:16px 16px 8px}
+.chartbox .ct{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+.chartwrap{position:relative;height:210px}
+
+.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:14px;max-height:560px}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+thead th{position:sticky;top:0;background:#f1ece2;color:var(--ink2);font-weight:700;font-size:11px;letter-spacing:.05em;
+  text-transform:uppercase;text-align:right;padding:11px 12px;white-space:nowrap;cursor:pointer;border-bottom:2px solid var(--line2);z-index:2}
+thead th.l{text-align:left}
+thead th:hover{color:var(--gold2)}
+tbody td{padding:9px 12px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+tbody td.l{text-align:left}
+tbody tr:hover{background:#f6f1e8}
+.art-cell{font-weight:700;color:var(--ink)}
+.neg{color:var(--rust);font-weight:700}
+.posv{color:var(--sage);font-weight:700}
+.zero{color:var(--faint)}
+.flagless{color:var(--gold2);font-size:11px}
+tfoot td{position:sticky;bottom:0;background:#efe8dc;font-weight:800;padding:12px;border-top:2px solid var(--line2);text-align:right}
+tfoot td.l{text-align:left}
+
+/* ---------- loader ---------- */
+#loader{position:fixed;inset:0;background:rgba(246,242,234,.92);backdrop-filter:blur(4px);display:none;place-items:center;z-index:60}
+#loader.on{display:grid}
+.loadcard{text-align:center}
+.spin{width:54px;height:54px;border-radius:50%;border:4px solid var(--line2);border-top-color:var(--gold);margin:0 auto 18px;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+#loadlog{font-size:13px;color:var(--ink2);font-weight:600;max-width:380px}
+#loadlog .step{opacity:.5;margin:3px 0}
+#loadlog .step.now{opacity:1;color:var(--ink)}
+#loadlog .step.done{opacity:.7}
+#loadlog .step.done:before{content:"✓ ";color:var(--green)}
+
+@media(max-width:560px){
+  .card{padding:28px 22px} .head h1{font-size:28px}
+  .row2{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- ============ CONFIG SCREEN ============ -->
+<section id="config">
+  <div class="card">
+    <div class="head">
+      <div class="logo"><span>Ef</span></div>
+      <div>
+        <h1>EasyForm</h1>
+        <div class="sub">Wildberries · аналитика рекламы</div>
+      </div>
+    </div>
+
+    <div id="proxyPill" class="pill"><span class="dot"></span><span id="proxyPillTxt">Данные через Cloudflare Worker прокси</span></div>
+
+    <div class="mt">
+      <label class="label">API токен WB (продвижение + статистика)</label>
+      <input id="token" class="fld token" type="password" placeholder="eyJhbGciOi…" autocomplete="off">
+      <div class="hint">Нужен токен с категориями <b>Продвижение</b> и <b>Статистика</b>. Хранится только в вашем браузере.</div>
+    </div>
+
+    <div class="mt">
+      <label class="label">URL прокси (Cloudflare Worker)</label>
+      <input id="proxy" class="fld" type="text" value="https://wb-proxy-worker.ooo6311ooo.workers.dev" placeholder="https://wb-proxy.xxxxx.workers.dev">
+      <div class="hint">Нет прокси? <a href="#" id="openProxyHelp">Создай бесплатно на Cloudflare</a></div>
+    </div>
+
+    <div class="row2 mt">
+      <div>
+        <label class="label">Период с</label>
+        <input id="dateFrom" class="fld" type="date">
+      </div>
+      <div>
+        <label class="label">Период по</label>
+        <input id="dateTo" class="fld" type="date">
+      </div>
+    </div>
+
+    <details class="adv">
+      <summary><span class="chev">▸</span> Дополнительно · себестоимость, выкупаемость, реклама по размерам</summary>
+      <div class="adv-body">
+        <div>
+          <label class="label">Google-таблица себестоимости (ссылка CSV)</label>
+          <input id="sheet" class="fld" type="text" value="https://docs.google.com/spreadsheets/d/e/2PACX-1vQZuc_t740K_yF5Nhw3saPZcbyxchMhJ93WrS05BbLY9OqqXtj3y5xG6WaraGsI4Z7SmNTHFyBlNTcn/pub?gid=0&single=true&output=tsv" placeholder="https://docs.google.com/spreadsheets/d/e/…/pub?output=tsv">
+          <div class="hint">Файл → Поделиться → Опубликовать в интернете → CSV/TSV. Колонки: <b>supplierArticle</b>, <b>Прибыль до рекламы</b>, опц. <b>Выкупаемость</b>. Прибыль для отдельного размера — строкой <b>артикул;размер</b> (напр. <code>Pantal.SK.bejnew.02;40 42</code>).</div>
+        </div>
+        <div class="row2">
+          <div>
+            <label class="label">Выкупаемость по умолчанию, %</label>
+            <input id="buyout" class="fld" type="number" min="1" max="100" step="1" value="100">
+            <div class="hint">Если в таблице нет колонки «Выкупаемость».</div>
+          </div>
+          <div>
+            <label class="label">Учитывать отменённые заказы</label>
+            <select id="incCancel" class="fld"><option value="0">Нет (только активные)</option><option value="1">Да</option></select>
+          </div>
+        </div>
+        <div>
+          <label class="label">Исключения распределения рекламы (артикул | размер → расход 0)</label>
+          <textarea id="excl" class="fld" placeholder="Pantal.SK.bejnew.02 | 40 42"></textarea>
+          <div class="hint">По строке на исключение. Такой размер получает расход рекламы = 0 и исключается из распределения между остальными размерами артикула.</div>
+        </div>
+      </div>
+    </details>
+
+    <button id="load" class="btn-primary mt">Загрузить дашборд</button>
+    <div id="cfgErr" class="err hidden"></div>
+  </div>
+</section>
+
+<!-- ============ DASHBOARD ============ -->
+<section id="dash" class="hidden">
+  <div class="topbar">
+    <div class="logo"><span>Ef</span></div>
+    <div>
+      <h1>EasyForm</h1>
+      <div class="sub">Аналитика эффективности рекламы</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="period-chip" id="periodChip"></div>
+    <button class="btn-ghost" id="reloadBtn">Обновить</button>
+    <button class="btn-ghost" id="backBtn">Изменить</button>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="panel">
+    <h3>Фильтры</h3>
+    <div class="filters">
+      <div class="fgrp"><label class="label">Артикул</label><select id="fArt" class="fld"></select></div>
+      <div class="fgrp"><label class="label">Размер</label><select id="fSize" class="fld"></select></div>
+      <div class="fgrp"><label class="label">Период с</label><input id="fFrom" class="fld" type="date"></div>
+      <div class="fgrp"><label class="label">Период по</label><input id="fTo" class="fld" type="date"></div>
+      <button class="btn-ghost" id="resetFilters">Сбросить</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>Динамика по дням</h3>
+    <div class="charts">
+      <div class="chartbox"><div class="ct">Заказы · расход рекламы</div><div class="chartwrap"><canvas id="cOrdersSpend"></canvas></div></div>
+      <div class="chartbox"><div class="ct">Прибыль до / после рекламы, ₽</div><div class="chartwrap"><canvas id="cProfit"></canvas></div></div>
+      <div class="chartbox"><div class="ct">CTR · CR, %</div><div class="chartwrap"><canvas id="cRates"></canvas></div></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>Детализация: день → артикул → размер</h3>
+    <div class="tablewrap">
+      <table id="tbl">
+        <thead><tr>
+          <th class="l" data-k="date">Дата</th>
+          <th class="l" data-k="article">Артикул</th>
+          <th class="l" data-k="size">Размер</th>
+          <th data-k="orders">Заказы</th>
+          <th data-k="spend">Расход рекл.</th>
+          <th data-k="views">Показы</th>
+          <th data-k="clicks">Клики</th>
+          <th data-k="ctr">CTR</th>
+          <th data-k="cr">CR</th>
+          <th data-k="profitBefore">Прибыль до рекл.</th>
+          <th data-k="profitAfter">Прибыль после рекл.</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+        <tfoot id="tfoot"></tfoot>
+      </table>
+    </div>
+    <div class="hint" style="margin-top:10px">
+      Показы, клики, CTR и CR — на уровне артикул/день (реклама не делится по размерам), поэтому повторяются в строках размеров.
+      Расход рекламы распределяется по размерам равномерно; прибыль = заказы × выкупаемость × «прибыль до рекламы» из таблицы; «после рекламы» = минус распределённый расход.
+      Для размеров с особой прибылью (строка <code>артикул;размер</code> в таблице) берётся именно её значение, а не базовое по артикулу. Значок «∅» — размер исключён из распределения рекламы (расход 0).
+    </div>
+  </div>
+</section>
+
+<!-- ============ LOADER ============ -->
+<div id="loader"><div class="loadcard"><div class="spin"></div><div id="loadlog"></div></div></div>
+
+<!-- ============ PROXY HELP MODAL ============ -->
+<div id="proxyHelp" class="modal-bg hidden">
+  <div class="modal">
+    <button class="modal-x" id="closeProxyHelp">×</button>
+    <h2 class="brandfont">Бесплатный прокси за 3 минуты</h2>
+    <p>Браузер не может обращаться к WB API напрямую (нет CORS-заголовков). Cloudflare Worker решает это и бесплатен до 100 000 запросов в день.</p>
+    <ol>
+      <li>Откройте <a href="https://dash.cloudflare.com/" target="_blank">dash.cloudflare.com</a> → <b>Workers &amp; Pages</b> → <b>Create</b> → <b>Worker</b>.</li>
+      <li>Удалите шаблон, вставьте код ниже, нажмите <b>Deploy</b>.</li>
+      <li>Скопируйте адрес вида <code>https://wb-proxy.…workers.dev</code> в поле «URL прокси».</li>
+    </ol>
+    <pre id="workerCode">загрузка…</pre>
+    <button class="btn-ghost" id="copyWorker">Скопировать код воркера</button>
+  </div>
+</div>
+
+<script>
+/* =======================================================================
+   EasyForm — клиентская логика. Все запросы к WB идут через прокси:
+   GET  {proxy}/{полный_url_wb}      (+ заголовок Authorization)
+   ======================================================================= */
+
+const $ = s => document.querySelector(s);
+const WB_ADV = "https://advert-api.wildberries.ru";
+const WB_STAT = "https://statistics-api.wildberries.ru";
+
+const state = { token:"", proxy:"", from:"", to:"", sheetUrl:"", buyout:100, incCancel:false, exclusions:[], computed:null };
+const charts = {};
+
+/* ---------- persist config locally (это локальный файл, localStorage ок) ---------- */
+function saveCfg(){ try{ localStorage.setItem("ef_cfg", JSON.stringify({
+  proxy:state.proxy, sheetUrl:state.sheetUrl, buyout:state.buyout, incCancel:state.incCancel,
+  excl:$("#excl").value
+})); }catch(e){} }
+function loadCfg(){
+  try{
+    const c = JSON.parse(localStorage.getItem("ef_cfg")||"{}");
+    if(c.proxy) $("#proxy").value=c.proxy;
+    if(c.sheetUrl) $("#sheet").value=c.sheetUrl;
+    if(c.buyout) $("#buyout").value=c.buyout;
+    if(c.incCancel) $("#incCancel").value="1";
+    $("#excl").value = (c.excl!=null) ? c.excl : "Pantal.SK.bejnew.02 | 40 42";
+  }catch(e){ $("#excl").value="Pantal.SK.bejnew.02 | 40 42"; }
+}
+
+/* ---------- defaults: period 20.05–03.06.2026 как на макете ---------- */
+function initDates(){
+  $("#dateFrom").value = "2026-05-20";
+  $("#dateTo").value   = "2026-06-03";
+}
+
+/* ---------- networking ---------- */
+function proxyUrl(target){ return state.proxy.replace(/\/+$/,"") + "/" + target; }
+async function wb(target, {method="GET", body=null}={}){
+  const headers = {};
+  const t = state.token.trim();
+  if(t) headers["Authorization"] = t;            // WB принимает «голый» токен
+  if(body) headers["Content-Type"]="application/json";
+  const res = await fetch(proxyUrl(target), { method, headers, body: body?JSON.stringify(body):undefined });
+  const text = await res.text();
+  if(!res.ok){
+    let msg = text.slice(0,200);
+    if(res.status===401) msg = "401 — токен недействителен или нет нужных категорий доступа.";
+    if(res.status===403) msg = "403 — прокси отклонил хост или нет доступа.";
+    if(res.status===429) msg = "429 — слишком много запросов к WB, подождите минуту.";
+    throw new Error(msg || ("HTTP "+res.status));
+  }
+  try{ return JSON.parse(text); }catch(e){ return text; }
+}
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+function chunk(a,n){ const o=[]; for(let i=0;i<a.length;i+=n) o.push(a.slice(i,i+n)); return o; }
+
+/* ---------- loader log ---------- */
+let steps=[];
+function setSteps(arr){ steps=arr.map(t=>({t,s:"wait"})); renderLog(); }
+function stepNow(i){ steps.forEach((s,j)=>s.s = j<i?"done":(j===i?"now":"wait")); renderLog(); }
+function stepsDone(){ steps.forEach(s=>s.s="done"); renderLog(); }
+function renderLog(){ $("#loadlog").innerHTML = steps.map(s=>`<div class="step ${s.s==="now"?"now":(s.s==="done"?"done":"")}">${s.t}</div>`).join(""); }
+
+/* ---------- date helpers ---------- */
+function ymd(d){ return d; }                       // already YYYY-MM-DD
+function dateOnly(s){ return (s||"").slice(0,10); }
+function* dayRange(from,to){ let d=new Date(from+"T00:00:00"); const e=new Date(to+"T00:00:00");
+  while(d<=e){ yield d.toISOString().slice(0,10); d.setDate(d.getDate()+1); } }
+function norm(s){ return (s==null?"":String(s)).trim(); }
+function keyArt(s){ return norm(s).toLowerCase(); }
+
+/* =======================================================================
+   FETCH PIPELINE
+   ======================================================================= */
+async function runPipeline(){
+  setSteps([
+    "Получаю список рекламных кампаний",
+    "Сопоставляю кампании с артикулами",
+    "Загружаю статистику рекламы (показы, клики, расход)",
+    "Загружаю реальные заказы (Statistics API)",
+    "Читаю себестоимость из Google-таблицы",
+    "Связываю данные по supplierArticle и считаю прибыль",
+  ]);
+
+  /* 1. campaigns list */
+  stepNow(0);
+  const count = await wb(WB_ADV + "/adv/v1/promotion/count");
+  let advIds = [];
+  if(count && Array.isArray(count.adverts)){
+    for(const grp of count.adverts){
+      const list = grp.advert_list || grp.advertList || [];
+      for(const a of list) if(a.advertId!=null) advIds.push(a.advertId);
+    }
+  }
+  advIds = [...new Set(advIds)];
+  if(!advIds.length) throw new Error("В кабинете не найдено рекламных кампаний.");
+
+  /* 2. campaign names -> article map */
+  stepNow(1);
+  const nameById = {};
+  for(const part of chunk(advIds, 50)){
+    const info = await wb(WB_ADV + "/adv/v1/promotion/adverts", {method:"POST", body:part});
+    if(Array.isArray(info)) for(const c of info){ if(c.advertId!=null) nameById[c.advertId] = norm(c.name); }
+    await sleep(120);
+  }
+  // article -> [advertId]; advertId -> article (article = campaign name)
+  const articleOfAdv = {};
+  for(const id of advIds){ const nm = nameById[id]; if(nm) articleOfAdv[id] = nm; }
+
+  /* 3. ad fullstats (max 31 days per request, chunk ids by 40) */
+  stepNow(2);
+  const adByArtDate = new Map();   // "art|date" -> {views,clicks,adOrders,spend}
+  const begin = state.from, end = state.to;
+  for(const part of chunk(advIds, 40)){
+    let stats;
+    try{
+      stats = await wb(WB_ADV + `/adv/v3/fullstats?ids=${part.join(",")}&beginDate=${begin}&endDate=${end}`);
+    }catch(e){ // если пачка падает — пробуем по одной, чтобы не терять всё
+      stats = [];
+      for(const id of part){
+        try{ const s = await wb(WB_ADV + `/adv/v3/fullstats?ids=${id}&beginDate=${begin}&endDate=${end}`); if(s) stats.push(Array.isArray(s)?s[0]:s); await sleep(400);}catch(_){}
+      }
+    }
+    if(Array.isArray(stats)){
+      for(const camp of stats){
+        const art = articleOfAdv[camp.advertId];
+        if(!art) continue;
+        const days = camp.days || [];
+        for(const d of days){
+          const date = dateOnly(d.date);
+          const k = keyArt(art)+"|"+date;
+          const cur = adByArtDate.get(k) || {article:art, date, views:0,clicks:0,adOrders:0,spend:0};
+          cur.views  += (+d.views||0);
+          cur.clicks += (+d.clicks||0);
+          cur.adOrders += (+d.orders||0);
+          cur.spend  += (+d.sum||0);
+          adByArtDate.set(k,cur);
+        }
+      }
+    }
+    await sleep(350);
+  }
+
+  /* 4. real orders */
+  stepNow(3);
+  const ordersRaw = await wb(WB_STAT + `/api/v1/supplier/orders?dateFrom=${state.from}T00:00:00&flag=0`);
+  const ordByKey = new Map();          // "date|artLower|size" -> {date,article,size,count}
+  const sizesByArtDate = new Map();    // "artLower|date" -> Set(size)
+  if(Array.isArray(ordersRaw)){
+    for(const o of ordersRaw){
+      const date = dateOnly(o.date);
+      if(date < state.from || date > state.to) continue;
+      if(!state.incCancel && o.isCancel) continue;
+      const art = norm(o.supplierArticle);
+      const size = norm(o.techSize) || "—";
+      const k = date+"|"+keyArt(art)+"|"+size;
+      const cur = ordByKey.get(k) || {date, article:art, size, count:0};
+      cur.count++; ordByKey.set(k,cur);
+      const sk = keyArt(art)+"|"+date;
+      if(!sizesByArtDate.has(sk)) sizesByArtDate.set(sk,new Set());
+      sizesByArtDate.get(sk).add(size);
+    }
+  }
+
+  /* 5. cost sheet */
+  stepNow(4);
+  const cost = await loadSheet();   // {byArt:{artLower:{profit,buyout}}, hasBuyout}
+
+  /* 6. combine */
+  stepNow(5);
+  const computed = combine(adByArtDate, ordByKey, sizesByArtDate, cost);
+  computed.meta = {
+    campaigns: advIds.length,
+    matched: Object.keys(articleOfAdv).length,
+    ordersTotal: Array.isArray(ordersRaw)?ordersRaw.length:0,
+    costRows: cost ? (Object.keys(cost.byArt).length + Object.values(cost.bySize||{}).reduce((s,o)=>s+Object.keys(o).length,0)) : 0,
+    hasBuyoutCol: cost ? cost.hasBuyout : false,
+  };
+  stepsDone();
+  return computed;
+}
+
+/* ---------- google sheet (published CSV) ---------- */
+async function loadSheet(){
+  let url = state.sheetUrl.trim();
+  if(!url) return null;
+  // обычную ссылку /edit превращаем в export; published pub?output=tsv/csv оставляем как есть
+  if(/\/edit/.test(url) && !/output=(csv|tsv)|format=(csv|tsv)/.test(url)){
+    const m = url.match(/\/d\/([^/]+)/); const gid=(url.match(/gid=(\d+)/)||[])[1]||"0";
+    if(m) url = `https://docs.google.com/spreadsheets/d/${m[1]}/export?format=tsv&gid=${gid}`;
+  }
+  let text;
+  try{ const r = await fetch(url); if(!r.ok) throw new Error("HTTP "+r.status); text = await r.text(); }
+  catch(e){ throw new Error("Не удалось прочитать Google-таблицу — проверьте, что она опубликована (Файл → Поделиться → Опубликовать в интернете → CSV/TSV). " + e.message); }
+  return parseTable(text);
+}
+function sizeNorm(s){ return norm(s).toLowerCase().replace(/[\s\-_./]+/g,""); }
+function parseTable(text){
+  const firstLine = text.split("\n")[0]||"";
+  const delim = firstLine.indexOf("\t")>=0 ? "\t" : ",";
+  const rows = tableRows(text, delim);
+  if(!rows.length) return {byArt:{}, bySize:{}, hasBuyout:false};
+  const head = rows[0].map(h=>h.toLowerCase().trim());
+  const findCol = preds => head.findIndex(h=>preds.some(p=>h.includes(p)));
+  const cArt = findCol(["supplierarticle","артикул продавца","артикул","article"]);
+  const cProfit = findCol(["прибыль до рекл","прибыль до","profit","прибыль"]);
+  const cBuy = findCol(["выкуп","buyout"]);
+  const byArt={}, bySize={}; let hasBuyout=false;
+  for(let i=1;i<rows.length;i++){
+    const r = rows[i]; if(!r || cArt<0) continue;
+    const raw = norm(r[cArt]); if(!raw) continue;
+    const profit = cProfit>=0 ? parseNum(r[cProfit]) : 0;
+    let buyout = null;
+    if(cBuy>=0){ const b = parseNum(r[cBuy]); if(b!=null){ buyout = b>1.5 ? b/100 : b; hasBuyout=true; } }
+    const rec = {profit: profit||0, buyout};
+    const semi = raw.indexOf(";");                       // "артикул;размер" — прибыль только для этого размера
+    if(semi>=0){
+      const art = keyArt(raw.slice(0,semi));
+      const sn  = sizeNorm(raw.slice(semi+1));
+      (bySize[art] = bySize[art]||{})[sn] = rec;
+    } else {
+      byArt[keyArt(raw)] = rec;
+    }
+  }
+  return {byArt, bySize, hasBuyout};
+}
+function parseNum(v){ if(v==null) return null; const s=String(v).replace(/\s/g,"").replace(",","."); const n=parseFloat(s.replace(/[^0-9.\-]/g,"")); return isNaN(n)?null:n; }
+function tableRows(text, delim){
+  const out=[]; let row=[], cur="", q=false;
+  for(let i=0;i<text.length;i++){ const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=c; }
+    else { if(c==='"') q=true; else if(c===delim){ row.push(cur); cur=""; }
+      else if(c==='\n'){ row.push(cur); out.push(row); row=[]; cur=""; }
+      else if(c==='\r'){} else cur+=c; } }
+  if(cur.length||row.length){ row.push(cur); out.push(row); }
+  return out.filter(r=>r.length>1 || (r[0]&&r[0].trim()));
+}
+
+/* ---------- combine + distribute ---------- */
+function exclusionSet(){
+  // returns Map artLower -> Set(sizeNorm)
+  const m = new Map();
+  for(const line of state.exclusions){
+    const [a,s] = line.split("|").map(x=>norm(x));
+    if(!a) continue;
+    const k = keyArt(a);
+    if(!m.has(k)) m.set(k,new Set());
+    if(s) m.get(k).add(sizeNorm(s));
+  }
+  return m;
+}
+function combine(adByArtDate, ordByKey, sizesByArtDate, cost){
+  const excl = exclusionSet();
+  // прибыль/выкупаемость: сначала ищем особый размер (артикул;размер), затем артикул целиком
+  const sizeRec = (artL,size) => (cost && cost.bySize[artL] && cost.bySize[artL][sizeNorm(size)]) || null;
+  const artRec  = artL => (cost && cost.byArt[artL]) || null;
+  const profitOf = (artL,size) => { const sr=sizeRec(artL,size); if(sr) return sr.profit||0; const ar=artRec(artL); return ar?(ar.profit||0):0; };
+  const buyoutOf = (artL,size) => { const sr=sizeRec(artL,size); if(sr&&sr.buyout!=null) return sr.buyout; const ar=artRec(artL); if(ar&&ar.buyout!=null) return ar.buyout; return state.buyout/100; };
+  const hasCost  = (artL,size) => !!(sizeRec(artL,size) || artRec(artL));
+
+  // union of (art,date) pairs from ads + orders
+  const pairs = new Set();
+  for(const k of adByArtDate.keys()) pairs.add(k);
+  for(const sk of sizesByArtDate.keys()) pairs.add(sk);
+
+  const rows = [];
+  for(const pk of pairs){
+    const [artL, date] = pk.split("|");
+    const adm = adByArtDate.get(pk) || {article:null,views:0,clicks:0,adOrders:0,spend:0};
+    const sizesSet = sizesByArtDate.get(pk) || new Set();
+    const sizes = [...sizesSet];
+    // article display name: prefer order's, else ad's
+    let artName = adm.article;
+    if(sizes.length){ const anyKey=[...ordByKey.keys()].find(k=>k.startsWith(date+"|"+artL+"|")); if(anyKey) artName = ordByKey.get(anyKey).article; }
+    artName = artName || artL;
+
+    const exSet = excl.get(artL) || new Set();
+    const eligible = sizes.filter(s=>!exSet.has(sizeNorm(s)));
+    const spend = adm.spend||0;
+    const ctr = adm.views ? adm.clicks/adm.views*100 : 0;
+    const cr  = adm.clicks ? adm.adOrders/adm.clicks*100 : 0;
+    const perSize = eligible.length ? spend/eligible.length : 0;
+
+    if(!sizes.length){
+      // расход есть, заказов нет
+      if(spend>0 || adm.views>0){
+        rows.push(mkRow(date,artName,artL,"—",0,spend,adm,ctr,cr,profitOf,buyoutOf,hasCost,false));
+      }
+      continue;
+    }
+    let leftover = 0;
+    for(const s of sizes){
+      const cnt = (ordByKey.get(date+"|"+artL+"|"+s)||{count:0}).count;
+      const isEx = exSet.has(sizeNorm(s));
+      let sSpend = isEx ? 0 : perSize;
+      if(eligible.length===0) sSpend = 0;
+      rows.push(mkRow(date,artName,artL,s,cnt,sSpend,adm,ctr,cr,profitOf,buyoutOf,hasCost,isEx));
+    }
+    if(eligible.length===0 && spend>0){
+      // все размеры исключены — расход некуда распределить, выносим отдельной строкой
+      rows.push(mkRow(date,artName,artL,"(не распределено)",0,spend,adm,ctr,cr,profitOf,buyoutOf,hasCost,false));
+    }
+  }
+  rows.sort((a,b)=> a.date<b.date?-1:a.date>b.date?1:(a.article<b.article?-1:a.article>b.article?1:(a.size<b.size?-1:1)));
+  return { rows, adByArtDate };
+}
+function mkRow(date,article,artL,size,orders,spend,adm,ctr,cr,profitOf,buyoutOf,hasCost,excluded){
+  const pu = profitOf(artL,size), bo = buyoutOf(artL,size);
+  const profitBefore = orders * bo * pu;            // = ожидаемая прибыль (с выкупаемостью)
+  const profitAfter = profitBefore - spend;
+  return {
+    date, article, artL, size, orders,
+    spend, views: adm.views||0, clicks: adm.clicks||0, ctr, cr,
+    profitBefore, profitAfter, buyout:bo, profitUnit:pu, hasCost:hasCost(artL,size), excluded
+  };
+}
+
+/* =======================================================================
+   RENDER
+   ======================================================================= */
+const fmt = new Intl.NumberFormat("ru-RU");
+const money = v => fmt.format(Math.round(v)) + " ₽";
+const pct = v => (v||0).toFixed(2).replace(".",",") + "%";
+
+function buildFilters(){
+  const arts = [...new Set(state.computed.rows.map(r=>r.article))].sort();
+  $("#fArt").innerHTML = `<option value="">Все артикулы</option>` + arts.map(a=>`<option>${esc(a)}</option>`).join("");
+  $("#fFrom").value = state.from; $("#fTo").value = state.to;
+  refreshSizeOptions();
+}
+function refreshSizeOptions(){
+  const art = $("#fArt").value;
+  const pool = state.computed.rows.filter(r=>!art||r.article===art);
+  const sizes = [...new Set(pool.map(r=>r.size))].sort();
+  $("#fSize").innerHTML = `<option value="">Все размеры</option>` + sizes.map(s=>`<option>${esc(s)}</option>`).join("");
+}
+function currentFilter(){
+  return { art:$("#fArt").value, size:$("#fSize").value, from:$("#fFrom").value, to:$("#fTo").value };
+}
+function filteredRows(){
+  const f = currentFilter();
+  return state.computed.rows.filter(r=>
+    (!f.art||r.article===f.art) && (!f.size||r.size===f.size) &&
+    r.date>=f.from && r.date<=f.to);
+}
+// ad-level rows (для показов/кликов/CTR/CR — без учёта фильтра размера)
+function filteredAd(){
+  const f = currentFilter();
+  const out = [];
+  const fa = f.art ? keyArt(f.art) : "";
+  for(const v of state.computed.adByArtDate.values()){
+    if(fa && keyArt(v.article)!==fa) continue;
+    if(v.date<f.from||v.date>f.to) continue;
+    out.push(v);
+  }
+  return out;
+}
+
+function render(){
+  const rows = filteredRows();
+  const ad = filteredAd();
+  renderKpis(rows, ad);
+  renderTable(rows);
+  renderCharts(rows, ad);
+}
+
+function renderKpis(rows, ad){
+  const orders = rows.reduce((s,r)=>s+r.orders,0);
+  const spend = rows.reduce((s,r)=>s+r.spend,0);
+  const pB = rows.reduce((s,r)=>s+r.profitBefore,0);
+  const pA = rows.reduce((s,r)=>s+r.profitAfter,0);
+  const views = ad.reduce((s,r)=>s+r.views,0);
+  const clicks = ad.reduce((s,r)=>s+r.clicks,0);
+  const ctr = views?clicks/views*100:0;
+  const adOrders = ad.reduce((s,r)=>s+r.adOrders,0);
+  const cr = clicks?adOrders/clicks*100:0;
+  const drr = pB>0 ? spend/(pB)*100 : 0;
+  const m = state.computed.meta;
+  const k = [
+    ["Заказы (реальные)", fmt.format(orders), `${m.ordersTotal} в выгрузке`, ""],
+    ["Расход рекламы", money(spend), `${fmt.format(clicks)} кликов`, "accent"],
+    ["Прибыль до рекламы", money(pB), "с учётом выкупаемости", ""],
+    ["Прибыль после рекламы", money(pA), pA>=0?"реклама окупается":"реклама в минус", "profit"],
+    ["CTR / CR", pct(ctr)+" / "+pct(cr), `${fmt.format(views)} показов`, ""],
+    ["ДРР по прибыли", pB>0?pct(drr):"—", "расход ÷ прибыль до", "accent"],
+  ];
+  $("#kpis").innerHTML = k.map(([l,v,s,cls])=>`
+    <div class="kpi ${cls}"><div class="bar"></div>
+      <div class="k-l">${l}</div><div class="k-v">${v}</div><div class="k-s">${s}</div></div>`).join("");
+}
+
+function renderTable(rows){
+  const tb = $("#tbody");
+  if(!rows.length){ tb.innerHTML = `<tr><td class="l" colspan="11" style="padding:24px;color:var(--muted)">Нет данных за выбранные фильтры.</td></tr>`; $("#tfoot").innerHTML=""; return; }
+  tb.innerHTML = rows.map(r=>{
+    const pa = r.profitAfter;
+    const paCls = pa>0?"posv":(pa<0?"neg":"zero");
+    const noCost = !r.hasCost ? ` <span class="flagless" title="Нет себестоимости в таблице">●</span>` : "";
+    return `<tr>
+      <td class="l">${r.date}</td>
+      <td class="l art-cell">${esc(r.article)}</td>
+      <td class="l">${esc(r.size)}${r.excluded?' <span class="flagless" title="Исключён из распределения">∅</span>':''}</td>
+      <td>${fmt.format(r.orders)}</td>
+      <td>${r.spend?money(r.spend):'<span class="zero">0 ₽</span>'}</td>
+      <td>${r.views?fmt.format(r.views):'<span class="zero">0</span>'}</td>
+      <td>${r.clicks?fmt.format(r.clicks):'<span class="zero">0</span>'}</td>
+      <td>${pct(r.ctr)}</td>
+      <td>${pct(r.cr)}</td>
+      <td>${r.profitBefore?money(r.profitBefore):'<span class="zero">0 ₽</span>'}${noCost}</td>
+      <td class="${paCls}">${money(pa)}</td>
+    </tr>`;
+  }).join("");
+  const sum = rows.reduce((a,r)=>{ a.o+=r.orders;a.s+=r.spend;a.v+=r.views;a.c+=r.clicks;a.pb+=r.profitBefore;a.pa+=r.profitAfter; return a; },{o:0,s:0,v:0,c:0,pb:0,pa:0});
+  $("#tfoot").innerHTML = `<tr>
+    <td class="l" colspan="3">Итого · ${rows.length} строк</td>
+    <td>${fmt.format(sum.o)}</td><td>${money(sum.s)}</td>
+    <td>${fmt.format(sum.v)}</td><td>${fmt.format(sum.c)}</td>
+    <td>${pct(sum.v?sum.c/sum.v*100:0)}</td><td></td>
+    <td>${money(sum.pb)}</td>
+    <td class="${sum.pa>=0?'posv':'neg'}">${money(sum.pa)}</td></tr>`;
+}
+
+function byDay(rows, ad){
+  const days = [...dayRange(currentFilter().from, currentFilter().to)];
+  const map = {}; days.forEach(d=>map[d]={orders:0,spend:0,pb:0,pa:0,views:0,clicks:0,adOrders:0});
+  rows.forEach(r=>{ if(map[r.date]){ map[r.date].orders+=r.orders; map[r.date].spend+=r.spend; map[r.date].pb+=r.profitBefore; map[r.date].pa+=r.profitAfter; } });
+  ad.forEach(r=>{ if(map[r.date]){ map[r.date].views+=r.views; map[r.date].clicks+=r.clicks; map[r.date].adOrders+=r.adOrders; } });
+  return { days, get:k=>days.map(d=>map[d][k]),
+    ctr: days.map(d=>map[d].views?map[d].clicks/map[d].views*100:0),
+    cr:  days.map(d=>map[d].clicks?map[d].adOrders/map[d].clicks*100:0) };
+}
+const C = { ink:'#2c2722', terra:'#c47150', sage:'#6f8f6a', teal:'#3a7d83', gold:'#b3955f', rust:'#b8553f', line:'#e2dacc' };
+function mkChart(id, cfg){ if(charts[id]) charts[id].destroy(); charts[id]=new Chart($("#"+id), cfg); }
+const baseOpts = (extra={}) => ({ responsive:true, maintainAspectRatio:false,
+  interaction:{mode:'index',intersect:false},
+  plugins:{legend:{labels:{font:{family:'Manrope',size:11},color:C.ink,boxWidth:12,usePointStyle:true}},
+           tooltip:{titleFont:{family:'Manrope'},bodyFont:{family:'Manrope'}}},
+  scales:{ x:{grid:{display:false},ticks:{font:{family:'Manrope',size:10},color:'#9b9184',maxRotation:0,autoSkip:true,maxTicksLimit:8}}, ...extra }});
+
+function renderCharts(rows, ad){
+  const d = byDay(rows, ad);
+  const lbl = d.days.map(x=>x.slice(5));
+  mkChart("cOrdersSpend",{ type:'bar',
+    data:{labels:lbl,datasets:[
+      {type:'bar',label:'Заказы',data:d.get('orders'),backgroundColor:'rgba(58,125,131,.55)',borderRadius:5,yAxisID:'y'},
+      {type:'line',label:'Расход, ₽',data:d.get('spend'),borderColor:C.terra,backgroundColor:C.terra,tension:.35,pointRadius:2,yAxisID:'y1'}]},
+    options:baseOpts({ y:{position:'left',grid:{color:C.line},ticks:{font:{family:'Manrope',size:10},color:'#9b9184'},title:{display:true,text:'заказы',font:{size:9}}},
+      y1:{position:'right',grid:{display:false},ticks:{font:{family:'Manrope',size:10},color:'#9b9184'},title:{display:true,text:'₽',font:{size:9}}}}) });
+  mkChart("cProfit",{ type:'line',
+    data:{labels:lbl,datasets:[
+      {label:'До рекламы',data:d.get('pb'),borderColor:C.sage,backgroundColor:'rgba(111,143,106,.12)',fill:true,tension:.35,pointRadius:2},
+      {label:'После рекламы',data:d.get('pa'),borderColor:C.teal,backgroundColor:'rgba(58,125,131,.10)',fill:true,tension:.35,pointRadius:2}]},
+    options:baseOpts({ y:{grid:{color:C.line},ticks:{font:{family:'Manrope',size:10},color:'#9b9184',callback:v=>fmt.format(v)}}}) });
+  mkChart("cRates",{ type:'line',
+    data:{labels:lbl,datasets:[
+      {label:'CTR, %',data:d.ctr,borderColor:C.gold,backgroundColor:C.gold,tension:.35,pointRadius:2},
+      {label:'CR, %',data:d.cr,borderColor:C.rust,backgroundColor:C.rust,tension:.35,pointRadius:2}]},
+    options:baseOpts({ y:{grid:{color:C.line},ticks:{font:{family:'Manrope',size:10},color:'#9b9184',callback:v=>v+'%'}}}) });
+}
+
+/* ---------- table sorting ---------- */
+let sortK=null, sortDir=1;
+document.querySelectorAll("#tbl thead th").forEach(th=>th.addEventListener("click",()=>{
+  const k=th.dataset.k; if(sortK===k) sortDir*=-1; else {sortK=k;sortDir=1;}
+  const rows=filteredRows().sort((a,b)=>{ let x=a[k],y=b[k];
+    if(typeof x==="string"){return x<y?-sortDir:x>y?sortDir:0;} return (x-y)*sortDir; });
+  renderTable(rows);
+}));
+
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* =======================================================================
+   WIRING
+   ======================================================================= */
+function readCfg(){
+  state.token = $("#token").value;
+  state.proxy = $("#proxy").value;
+  state.from = $("#dateFrom").value;
+  state.to = $("#dateTo").value;
+  state.sheetUrl = $("#sheet").value;
+  state.buyout = Math.max(1, +$("#buyout").value||100);
+  state.incCancel = $("#incCancel").value==="1";
+  state.exclusions = $("#excl").value.split("\n").map(s=>s.trim()).filter(Boolean);
+}
+function validate(){
+  if(!state.token.trim()) return "Введите API токен WB.";
+  if(!state.proxy.trim() || !/^https?:\/\//.test(state.proxy)) return "Введите корректный URL прокси (https://…).";
+  if(!state.from||!state.to) return "Выберите период.";
+  if(state.from>state.to) return "Дата начала позже даты окончания.";
+  const days = (new Date(state.to)-new Date(state.from))/86400000;
+  if(days>31) return "Рекламная статистика WB ограничена 31 днём за запрос. Сократите период.";
+  return null;
+}
+async function go(){
+  readCfg();
+  const v = validate();
+  const ce=$("#cfgErr");
+  if(v){ ce.textContent=v; ce.classList.remove("hidden"); return; }
+  ce.classList.add("hidden"); saveCfg();
+  $("#loader").classList.add("on");
+  try{
+    state.computed = await runPipeline();
+    await sleep(250);
+    $("#config").classList.add("hidden");
+    $("#dash").classList.remove("hidden");
+    $("#periodChip").textContent = `${state.from} → ${state.to}`;
+    buildFilters();
+    render();
+  }catch(e){
+    ce.textContent = "Ошибка: " + (e.message||e);
+    ce.classList.remove("hidden");
+  }finally{
+    $("#loader").classList.remove("on");
+  }
+}
+
+$("#load").addEventListener("click", go);
+$("#reloadBtn").addEventListener("click", async ()=>{ $("#loader").classList.add("on"); try{ state.computed=await runPipeline(); buildFilters(); render(); }catch(e){ alert("Ошибка: "+e.message); } finally{ $("#loader").classList.remove("on"); }});
+$("#backBtn").addEventListener("click", ()=>{ $("#dash").classList.add("hidden"); $("#config").classList.remove("hidden"); });
+$("#fArt").addEventListener("change", ()=>{ refreshSizeOptions(); render(); });
+$("#fSize").addEventListener("change", render);
+$("#fFrom").addEventListener("change", render);
+$("#fTo").addEventListener("change", render);
+$("#resetFilters").addEventListener("click", ()=>{ $("#fArt").value="";$("#fSize").value="";$("#fFrom").value=state.from;$("#fTo").value=state.to; refreshSizeOptions(); render(); });
+
+/* proxy help modal */
+$("#openProxyHelp").addEventListener("click", e=>{ e.preventDefault(); $("#proxyHelp").classList.remove("hidden"); });
+$("#closeProxyHelp").addEventListener("click", ()=>$("#proxyHelp").classList.add("hidden"));
+$("#proxyHelp").addEventListener("click", e=>{ if(e.target.id==="proxyHelp") $("#proxyHelp").classList.add("hidden"); });
+$("#copyWorker").addEventListener("click", ()=>{ navigator.clipboard.writeText($("#workerCode").textContent).then(()=>{$("#copyWorker").textContent="Скопировано ✓";setTimeout(()=>$("#copyWorker").textContent="Скопировать код воркера",1500);}); });
+initDates(); loadCfg();
+</script>
+<script>
+// Исходник воркера для модалки (отдельно, чтобы не экранировать кавычки выше)
+const WORKER_SRC = `const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Methods":"GET,POST,PUT,PATCH,OPTIONS","Access-Control-Allow-Headers":"Authorization,Content-Type","Access-Control-Max-Age":"86400"};
+const ALLOWED=["advert-api.wildberries.ru","statistics-api.wildberries.ru","content-api.wildberries.ru","discounts-prices-api.wildberries.ru","common-api.wildberries.ru","seller-analytics-api.wildberries.ru"];
+export default {
+  async fetch(request){
+    if(request.method==="OPTIONS") return new Response(null,{status:204,headers:CORS});
+    const u=new URL(request.url);
+    const target=u.pathname.slice(1)+u.search;
+    if(!/^https?:\\/\\//i.test(target)) return j(400,{error:'Укажите полный URL WB после "/"'});
+    let host; try{host=new URL(target).host;}catch{return j(400,{error:"bad url"});}
+    if(!ALLOWED.includes(host)) return j(403,{error:"host not allowed: "+host});
+    const h=new Headers();
+    const a=request.headers.get("Authorization"); if(a) h.set("Authorization",a);
+    const ct=request.headers.get("Content-Type"); if(ct) h.set("Content-Type",ct);
+    const init={method:request.method,headers:h};
+    if(!["GET","HEAD"].includes(request.method)) init.body=await request.text();
+    let r; try{r=await fetch(target,init);}catch(e){return j(502,{error:"WB fetch: "+e.message});}
+    const out=new Headers(r.headers); for(const k in CORS) out.set(k,CORS[k]); out.delete("content-encoding");
+    return new Response(r.body,{status:r.status,statusText:r.statusText,headers:out});
+  }
+};
+function j(s,o){return new Response(JSON.stringify(o),{status:s,headers:{...CORS,"Content-Type":"application/json"}});}`;
+document.getElementById("workerCode").textContent = WORKER_SRC;
+</script>
+</body>
+</html>
