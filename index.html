@@ -238,8 +238,8 @@ tfoot td.l{text-align:left}
         </div>
         <div>
           <label class="label">Исключения распределения рекламы (артикул | размер → расход 0)</label>
-          <textarea id="excl" class="fld" placeholder="Pantal.SK.bejnew.02 | 40 42"></textarea>
-          <div class="hint">По строке на исключение. Такой размер получает расход рекламы = 0 и исключается из распределения между остальными размерами артикула.</div>
+          <textarea id="excl" class="fld" placeholder="Pantal.SK.bejnew.02 | 42 44"></textarea>
+          <div class="hint">По строке на исключение. Размер указывайте точно как в заказах (например <code>42 44</code> — это один размер). Такой размер получает расход, показы и клики = 0 и исключается из распределения между остальными размерами.</div>
         </div>
       </div>
     </details>
@@ -301,6 +301,8 @@ tfoot td.l{text-align:left}
           <th data-k="clicks">Клики</th>
           <th data-k="ctr">CTR</th>
           <th data-k="cr">CR</th>
+          <th data-k="buyout">Выкуп</th>
+          <th data-k="profitUnit">Прибыль/ед</th>
           <th data-k="profitBefore">Прибыль до рекл.</th>
           <th data-k="profitAfter">Прибыль после рекл.</th>
         </tr></thead>
@@ -309,9 +311,8 @@ tfoot td.l{text-align:left}
       </table>
     </div>
     <div class="hint" style="margin-top:10px">
-      Показы, клики, CTR и CR — на уровне артикул/день (реклама не делится по размерам), поэтому повторяются в строках размеров.
-      Расход рекламы распределяется по размерам равномерно; прибыль = заказы × выкупаемость × «прибыль до рекламы» из таблицы; «после рекламы» = минус распределённый расход.
-      Для размеров с особой прибылью (строка <code>артикул;размер</code> в таблице) берётся именно её значение, а не базовое по артикулу. Значок «∅» — размер исключён из распределения рекламы (расход 0).
+      Расход рекламы, показы и клики распределяются поровну между eligible размерами артикула за день; исключённые размеры получают 0.
+      Прибыль = заказы × выкупаемость × прибыль/ед из таблицы. Для размеров со своей строкой (<code>артикул;размер</code>) берётся именно она. Значок «∅» — размер исключён из распределения.
     </div>
   </div>
 </section>
@@ -361,8 +362,8 @@ function loadCfg(){
     if(c.sheetUrl) $("#sheet").value=c.sheetUrl;
     if(c.buyout) $("#buyout").value=c.buyout;
     if(c.incCancel) $("#incCancel").value="1";
-    $("#excl").value = (c.excl!=null) ? c.excl : "Pantal.SK.bejnew.02 | 42\nPantal.SK.bejnew.02 | 44";
-  }catch(e){ $("#excl").value="Pantal.SK.bejnew.02 | 42\nPantal.SK.bejnew.02 | 44"; }
+    $("#excl").value = (c.excl!=null) ? c.excl : "Pantal.SK.bejnew.02 | 42 44";
+  }catch(e){ $("#excl").value="Pantal.SK.bejnew.02 | 42 44"; }
 }
 
 /* ---------- defaults: period 20.05–03.06.2026 как на макете ---------- */
@@ -628,55 +629,65 @@ function combine(adByArtDate, ordByKey, sizesByArtDate, cost){
   for(const k of adByArtDate.keys()) pairs.add(k);
   for(const sk of sizesByArtDate.keys()) pairs.add(sk);
 
+  const CAMPAIGN_RENAME = {
+    "боди": "Bod.SK.black.01",
+  };
+  function renameCampaign(name){ const k=(name||"").trim().toLowerCase(); return CAMPAIGN_RENAME[k]||name; }
+
   const rows = [];
   for(const pk of pairs){
     const [artL, date] = pk.split("|");
     const adm = adByArtDate.get(pk) || {article:null,views:0,clicks:0,adOrders:0,spend:0};
     const sizesSet = sizesByArtDate.get(pk) || new Set();
     const sizes = [...sizesSet];
-    // article display name: prefer order's, else ad's
+    // article display name: prefer order's, else ad's; apply rename
     let artName = adm.article;
     if(sizes.length){ const anyKey=[...ordByKey.keys()].find(k=>k.startsWith(date+"|"+artL+"|")); if(anyKey) artName = ordByKey.get(anyKey).article; }
-    artName = artName || artL;
+    artName = renameCampaign(artName || artL);
 
     const exSet = excl.get(artL) || new Set();
     const eligible = sizes.filter(s=>!exSet.has(sizeNorm(s)));
-    const spend = adm.spend||0;
-    const ctr = adm.views ? adm.clicks/adm.views*100 : 0;
-    const cr  = adm.clicks ? adm.adOrders/adm.clicks*100 : 0;
-    const perSize = eligible.length ? spend/eligible.length : 0;
+    const n = eligible.length;
+    const spend   = adm.spend||0;
+    const views   = adm.views||0;
+    const clicks  = adm.clicks||0;
+    const perSize   = n ? spend  / n : 0;
+    const perViews  = n ? views  / n : 0;
+    const perClicks = n ? clicks / n : 0;
+    // CTR и CR считаем на уровне артикула (одинаковы для всех размеров)
+    const ctr = views ? clicks/views*100 : 0;
+    const cr  = (adm.clicks||0) ? adm.adOrders/adm.clicks*100 : 0;
 
     if(!sizes.length){
-      // расход есть, заказов нет
-      if(spend>0 || adm.views>0){
-        rows.push(mkRow(date,artName,artL,"—",0,spend,adm,ctr,cr,profitOf,revenueOf,buyoutOf,hasCost,false));
+      if(spend>0 || views>0){
+        rows.push(mkRow(date,artName,artL,"—",0,spend,views,clicks,ctr,cr,profitOf,revenueOf,buyoutOf,hasCost,false));
       }
       continue;
     }
-    let leftover = 0;
     for(const s of sizes){
-      const cnt = (ordByKey.get(date+"|"+artL+"|"+s)||{count:0}).count;
-      const isEx = exSet.has(sizeNorm(s));
-      let sSpend = isEx ? 0 : perSize;
-      if(eligible.length===0) sSpend = 0;
-      rows.push(mkRow(date,artName,artL,s,cnt,sSpend,adm,ctr,cr,profitOf,revenueOf,buyoutOf,hasCost,isEx));
+      const cnt   = (ordByKey.get(date+"|"+artL+"|"+s)||{count:0}).count;
+      const isEx  = exSet.has(sizeNorm(s));
+      const sSpend  = (isEx || n===0) ? 0 : perSize;
+      const sViews  = (isEx || n===0) ? 0 : perViews;
+      const sClicks = (isEx || n===0) ? 0 : perClicks;
+      rows.push(mkRow(date,artName,artL,s,cnt,sSpend,sViews,sClicks,ctr,cr,profitOf,revenueOf,buyoutOf,hasCost,isEx));
     }
-    if(eligible.length===0 && spend>0){
-      // все размеры исключены — расход некуда распределить, выносим отдельной строкой
-      rows.push(mkRow(date,artName,artL,"(не распределено)",0,spend,adm,ctr,cr,profitOf,revenueOf,buyoutOf,hasCost,false));
+    if(n===0 && spend>0){
+      rows.push(mkRow(date,artName,artL,"(не распределено)",0,spend,0,0,ctr,cr,profitOf,revenueOf,buyoutOf,hasCost,false));
     }
   }
   rows.sort((a,b)=> a.date<b.date?-1:a.date>b.date?1:(a.article<b.article?-1:a.article>b.article?1:(a.size<b.size?-1:1)));
   return { rows, adByArtDate };
 }
-function mkRow(date,article,artL,size,orders,spend,adm,ctr,cr,profitOf,revenueOf,buyoutOf,hasCost,excluded){
+function mkRow(date,article,artL,size,orders,spend,views,clicks,ctr,cr,profitOf,revenueOf,buyoutOf,hasCost,excluded){
   const pu = profitOf(artL,size), bo = buyoutOf(artL,size), ru = revenueOf(artL,size);
   const profitBefore = orders * bo * pu;
-  const profitAfter = profitBefore - spend;
+  const profitAfter  = profitBefore - spend;
   return {
     date, article, artL, size, orders,
-    spend, views: adm.views||0, clicks: adm.clicks||0, ctr, cr,
-    profitBefore, profitAfter, buyout:bo, profitUnit:pu, revenueUnit:ru, hasCost:hasCost(artL,size), excluded
+    spend, views, clicks, ctr, cr,
+    profitBefore, profitAfter, buyout:bo, profitUnit:pu, revenueUnit:ru,
+    hasCost:hasCost(artL,size), excluded
   };
 }
 
@@ -729,8 +740,8 @@ function renderKpis(rows, ad){
   const pB = rows.reduce((s,r)=>s+r.profitBefore,0);
   const pA = rows.reduce((s,r)=>s+r.profitAfter,0);
   const revenue = rows.reduce((s,r)=>s+(r.orders * r.buyout * (r.revenueUnit||r.profitUnit||0)),0);
-  const views = ad.reduce((s,r)=>s+r.views,0);
-  const clicks = ad.reduce((s,r)=>s+r.clicks,0);
+  const views  = rows.reduce((s,r)=>s+r.views,0);
+  const clicks = rows.reduce((s,r)=>s+r.clicks,0);
   const ctr = views?clicks/views*100:0;
   const adOrders = ad.reduce((s,r)=>s+r.adOrders,0);
   const cr = clicks?adOrders/clicks*100:0;
@@ -739,10 +750,10 @@ function renderKpis(rows, ad){
   const m = state.computed.meta;
   const k = [
     ["Заказы (реальные)", fmt.format(orders), `${m.ordersTotal} в выгрузке`, ""],
-    ["Расход рекламы", money(spend), `${fmt.format(clicks)} кликов`, "accent"],
+    ["Расход рекламы", money(spend), `${fmt.format(Math.round(clicks))} кликов`, "accent"],
     ["Прибыль до рекламы", money(pB), "с учётом выкупаемости", ""],
     ["Прибыль после рекламы", money(pA), pA>=0?"реклама окупается":"реклама в минус", "profit"],
-    ["CTR / CR", pct(ctr)+" / "+pct(cr), `${fmt.format(views)} показов`, ""],
+    ["CTR / CR", pct(ctr)+" / "+pct(cr), `${fmt.format(Math.round(views))} показов`, ""],
     ["ДРР по прибыли", pB>0?pct(drrProfit):"—", "расход ÷ прибыль до", "accent"],
     ["ДРР по выручке", revenue>0?pct(drrRevenue):"—", "расход ÷ выручка", "accent"],
   ];
@@ -754,17 +765,22 @@ function renderKpis(rows, ad){
 function renderTable(rows){
   const tb = $("#tbody");
   const sizeThEl = document.querySelector("#tbl thead th[data-k='size']");
+  const buyoutThEl = document.querySelector("#tbl thead th[data-k='buyout']");
+  const puThEl = document.querySelector("#tbl thead th[data-k='profitUnit']");
   if(sizeThEl) sizeThEl.style.display = groupByArticle ? "none" : "";
+  if(buyoutThEl) buyoutThEl.style.display = groupByArticle ? "none" : "";
+  if(puThEl) puThEl.style.display = groupByArticle ? "none" : "";
 
-  if(!rows.length){ tb.innerHTML = `<tr><td class="l" colspan="11" style="padding:24px;color:var(--muted)">Нет данных за выбранные фильтры.</td></tr>`; $("#tfoot").innerHTML=""; return; }
+  if(!rows.length){ tb.innerHTML = `<tr><td class="l" colspan="13" style="padding:24px;color:var(--muted)">Нет данных за выбранные фильтры.</td></tr>`; $("#tfoot").innerHTML=""; return; }
 
   let displayRows = rows;
   if(groupByArticle){
     const map = {};
     for(const r of rows){
       const k = r.date+"|"+r.artL;
-      if(!map[k]) map[k]={...r,orders:0,spend:0,profitBefore:0,profitAfter:0};
+      if(!map[k]) map[k]={...r,orders:0,spend:0,views:0,clicks:0,profitBefore:0,profitAfter:0};
       map[k].orders+=r.orders; map[k].spend+=r.spend;
+      map[k].views+=r.views; map[k].clicks+=r.clicks;
       map[k].profitBefore+=r.profitBefore; map[k].profitAfter+=r.profitAfter;
     }
     displayRows=Object.values(map).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(a.article<b.article?-1:1));
@@ -775,27 +791,31 @@ function renderTable(rows){
     const paCls = pa>0?"posv":(pa<0?"neg":"zero");
     const noCost = !r.hasCost ? ` <span class="flagless" title="Нет себестоимости в таблице">●</span>` : "";
     const sizeCell = groupByArticle ? "" : `<td class="l">${esc(r.size)}${r.excluded?' <span class="flagless" title="Исключён из распределения">∅</span>':''}</td>`;
+    const buyoutCell = groupByArticle ? "" : `<td>${pct(r.buyout*100)}</td><td>${r.profitUnit?money(r.profitUnit):'<span class="zero">—</span>'}${noCost}</td>`;
     return `<tr>
       <td class="l">${fmtDate(r.date)}</td>
       <td class="l art-cell">${esc(r.article)}</td>
       ${sizeCell}
       <td>${fmt.format(r.orders)}</td>
       <td>${r.spend?money(r.spend):'<span class="zero">0 ₽</span>'}</td>
-      <td>${r.views?fmt.format(r.views):'<span class="zero">0</span>'}</td>
-      <td>${r.clicks?fmt.format(r.clicks):'<span class="zero">0</span>'}</td>
+      <td>${r.views?fmt.format(Math.round(r.views)):'<span class="zero">0</span>'}</td>
+      <td>${r.clicks?fmt.format(Math.round(r.clicks)):'<span class="zero">0</span>'}</td>
       <td>${pct(r.ctr)}</td>
       <td>${pct(r.cr)}</td>
-      <td>${r.profitBefore?money(r.profitBefore):'<span class="zero">0 ₽</span>'}${noCost}</td>
+      ${buyoutCell}
+      <td>${r.profitBefore?money(r.profitBefore):'<span class="zero">0 ₽</span>'}</td>
       <td class="${paCls}">${money(pa)}</td>
     </tr>`;
   }).join("");
   const sum = displayRows.reduce((a,r)=>{ a.o+=r.orders;a.s+=r.spend;a.v+=r.views;a.c+=r.clicks;a.pb+=r.profitBefore;a.pa+=r.profitAfter; return a; },{o:0,s:0,v:0,c:0,pb:0,pa:0});
   const colspan = groupByArticle ? 2 : 3;
+  const extraCols = groupByArticle ? "" : "<td></td><td></td>";
   $("#tfoot").innerHTML = `<tr>
     <td class="l" colspan="${colspan}">Итого · ${displayRows.length} строк</td>
     <td>${fmt.format(sum.o)}</td><td>${money(sum.s)}</td>
-    <td>${fmt.format(sum.v)}</td><td>${fmt.format(sum.c)}</td>
+    <td>${fmt.format(Math.round(sum.v))}</td><td>${fmt.format(Math.round(sum.c))}</td>
     <td>${pct(sum.v?sum.c/sum.v*100:0)}</td><td></td>
+    ${extraCols}
     <td>${money(sum.pb)}</td>
     <td class="${sum.pa>=0?'posv':'neg'}">${money(sum.pa)}</td></tr>`;
 }
@@ -803,8 +823,8 @@ function renderTable(rows){
 function byDay(rows, ad){
   const days = [...dayRange(currentFilter().from, currentFilter().to)];
   const map = {}; days.forEach(d=>map[d]={orders:0,spend:0,pb:0,pa:0,views:0,clicks:0,adOrders:0});
-  rows.forEach(r=>{ if(map[r.date]){ map[r.date].orders+=r.orders; map[r.date].spend+=r.spend; map[r.date].pb+=r.profitBefore; map[r.date].pa+=r.profitAfter; } });
-  ad.forEach(r=>{ if(map[r.date]){ map[r.date].views+=r.views; map[r.date].clicks+=r.clicks; map[r.date].adOrders+=r.adOrders; } });
+  rows.forEach(r=>{ if(map[r.date]){ map[r.date].orders+=r.orders; map[r.date].spend+=r.spend; map[r.date].pb+=r.profitBefore; map[r.date].pa+=r.profitAfter; map[r.date].views+=r.views; map[r.date].clicks+=r.clicks; } });
+  ad.forEach(r=>{ if(map[r.date]){ map[r.date].adOrders+=r.adOrders; } });
   return { days, get:k=>days.map(d=>map[d][k]),
     ctr: days.map(d=>map[d].views?map[d].clicks/map[d].views*100:0),
     cr:  days.map(d=>map[d].clicks?map[d].adOrders/map[d].clicks*100:0) };
