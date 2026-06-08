@@ -589,6 +589,7 @@ function parseTable(text){
       byArt[keyArt(raw)] = rec;
     }
   }
+  console.log("parseTable bySize:", JSON.stringify(Object.fromEntries(Object.entries(bySize).map(([k,v])=>[k,Object.keys(v)]))));
   return {byArt, bySize, hasBuyout};
 }
 function parseNum(v){ if(v==null) return null; const s=String(v).replace(/\s/g,"").replace(",","."); const n=parseFloat(s.replace(/[^0-9.\-]/g,"")); return isNaN(n)?null:n; }
@@ -605,7 +606,6 @@ function tableRows(text, delim){
 
 /* ---------- combine + distribute ---------- */
 function exclusionSet(){
-  // returns Map artLower -> Set(sizeNorm)
   const m = new Map();
   for(const line of state.exclusions){
     const [a,s] = line.split("|").map(x=>norm(x));
@@ -614,6 +614,7 @@ function exclusionSet(){
     if(!m.has(k)) m.set(k,new Set());
     if(s) m.get(k).add(sizeNorm(s));
   }
+  console.log("exclusionSet:", [...m.entries()].map(([k,v])=>k+"→["+[...v].join(",")+"]"));
   return m;
 }
 function combine(adByArtDate, ordByKey, sizesByArtDate, cost){
@@ -674,6 +675,7 @@ function combine(adByArtDate, ordByKey, sizesByArtDate, cost){
     for(const s of sizes){
       const ord=ordNorm.get(date+"|"+artL+"|"+s)||{count:0,revenue:0};
       const isEx=exSet.has(sizeNorm(s));
+      if(artL.includes("pantal") && artL.includes("bejnew")) console.log(`[DBG] artL="${artL}" size="${s}" sizeNorm="${sizeNorm(s)}" exSet=[${[...exSet].join(",")}] isEx=${isEx}`);
       rows.push(mkRow(date,artName,artL,s,ord.count,ord.revenue,
         isEx||n===0?0:perSpend, isEx||n===0?0:perViews, isEx||n===0?0:perClicks,
         ctr,cr,profitOf,buyoutOf,hasCost,isEx));
