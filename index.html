@@ -418,48 +418,44 @@ async function runPipeline(){
   ]);
 
   /* 1-2. campaigns + names.
-     Метод /adv/v1/promotion/adverts поддерживает GET (query-параметры → кампании с именами)
-     и POST (по списку ID). У части кабинетов/прокси POST даёт 404, поэтому GET — основной. */
+     Рабочая схема: /adv/v1/promotion/count → список ID, затем
+     GET /api/advert/v2/adverts?ids=… → детали кампаний (c.id, c.settings.name).
+     (Старый /adv/v1/promotion/adverts на части кабинетов/прокси отдаёт 404.) */
   stepNow(0);
   const nameById = {};
   let advIds = [];
 
-  // A) GET /adv/v1/promotion/adverts — сразу отдаёт кампании с названиями
-  try{
-    const arr = await wb(WB_ADV + "/adv/v1/promotion/adverts?order=change&direction=desc");
-    if(Array.isArray(arr) && arr.length){
-      for(const c of arr) if(c && c.advertId!=null){ nameById[c.advertId]=norm(c.name); advIds.push(c.advertId); }
-    }
-  }catch(e){ /* перейдём к плану B */ }
-
-  // B) если GET ничего не дал — count (список ID) + POST adverts (имена по ID)
-  if(!advIds.length){
-    const count = await wb(WB_ADV + "/adv/v1/promotion/count");
-    if(count && Array.isArray(count.adverts)){
-      for(const grp of count.adverts){
-        const list = grp.advert_list || grp.advertList || [];
-        for(const a of list) if(a.advertId!=null) advIds.push(a.advertId);
-      }
-    }
-    advIds = [...new Set(advIds)];
-    if(!advIds.length) throw new Error("В кабинете не найдено рекламных кампаний (методы /promotion/adverts и /promotion/count вернули пусто). Проверьте, что у токена есть категория «Продвижение».");
-    stepNow(1);
-    for(const part of chunk(advIds, 50)){
-      try{
-        const info = await wb(WB_ADV + "/adv/v1/promotion/adverts", {method:"POST", body:part});
-        if(Array.isArray(info)) for(const c of info){ if(c.advertId!=null) nameById[c.advertId] = norm(c.name); }
-      }catch(e){ /* имена не критичны для fullstats, продолжаем */ }
-      await sleep(120);
+  const count = await wb(WB_ADV + "/adv/v1/promotion/count");
+  if(count && Array.isArray(count.adverts)){
+    for(const grp of count.adverts){
+      // статусы, по которым доступна статистика: 7 (завершена), 9 (активна), 11 (пауза)
+      if(grp.status!=null && ![7,9,11].includes(grp.status)) continue;
+      const list = grp.advert_list || grp.advertList || [];
+      for(const a of list) if(a.advertId!=null) advIds.push(a.advertId);
     }
   }
   advIds = [...new Set(advIds)];
+  if(!advIds.length) throw new Error("В кабинете не найдено активных/завершённых кампаний за период. Проверьте, что у токена есть категория «Продвижение».");
+
   stepNow(1);
+  for(const part of chunk(advIds, 50)){
+    try{
+      const info = await wb(WB_ADV + "/api/advert/v2/adverts?ids=" + part.join(","));
+      const list = (info && Array.isArray(info.adverts)) ? info.adverts : (Array.isArray(info) ? info : []);
+      for(const c of list){
+        const id = c.advertId != null ? c.advertId : c.id;
+        const nm = norm((c.settings && c.settings.name) || c.name || "");
+        if(id != null && nm) nameById[id] = nm;
+      }
+    }catch(e){ /* имена для части пачки могли не прийти — продолжаем */ }
+    await sleep(150);
+  }
 
   // article -> [advertId]; advertId -> article (article = campaign name)
   const articleOfAdv = {};
   for(const id of advIds){ const nm = nameById[id]; if(nm) articleOfAdv[id] = nm; }
   if(!Object.keys(articleOfAdv).length){
-    throw new Error("Не удалось получить названия кампаний — связать рекламу с артикулами невозможно. Убедитесь, что токен имеет доступ к категории «Продвижение».");
+    throw new Error("Не удалось получить названия кампаний через /api/advert/v2/adverts — связать рекламу с артикулами невозможно. Проверьте доступ токена к категории «Продвижение».");
   }
 
   /* 3. ad fullstats (max 31 days per request, chunk ids by 40) */
@@ -476,21 +472,21 @@ async function runPipeline(){
         try{ const s = await wb(WB_ADV + `/adv/v3/fullstats?ids=${id}&beginDate=${begin}&endDate=${end}`); if(s) stats.push(Array.isArray(s)?s[0]:s); await sleep(400);}catch(_){}
       }
     }
-    if(Array.isArray(stats)){
-      for(const camp of stats){
-        const art = articleOfAdv[camp.advertId];
-        if(!art) continue;
-        const days = camp.days || [];
-        for(const d of days){
-          const date = dateOnly(d.date);
-          const k = keyArt(art)+"|"+date;
-          const cur = adByArtDate.get(k) || {article:art, date, views:0,clicks:0,adOrders:0,spend:0};
-          cur.views  += (+d.views||0);
-          cur.clicks += (+d.clicks||0);
-          cur.adOrders += (+d.orders||0);
-          cur.spend  += (+d.sum||0);
-          adByArtDate.set(k,cur);
-        }
+    const arr = Array.isArray(stats) ? stats : (stats && Array.isArray(stats.data) ? stats.data : []);
+    for(const camp of arr){
+      const cid = camp.advertId != null ? camp.advertId : camp.id;
+      const art = articleOfAdv[cid];
+      if(!art) continue;
+      const days = camp.days || [];
+      for(const d of days){
+        const date = dateOnly(d.date);
+        const k = keyArt(art)+"|"+date;
+        const cur = adByArtDate.get(k) || {article:art, date, views:0,clicks:0,adOrders:0,spend:0};
+        cur.views  += (+d.views||0);
+        cur.clicks += (+d.clicks||0);
+        cur.adOrders += (+d.orders||0);
+        cur.spend  += (+d.sum||0);
+        adByArtDate.set(k,cur);
       }
     }
     await sleep(350);
