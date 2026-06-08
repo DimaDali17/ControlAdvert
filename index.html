@@ -296,6 +296,7 @@ tfoot td.l{text-align:left}
           <th class="l" data-k="article">Артикул</th>
           <th class="l" data-k="size">Размер</th>
           <th data-k="orders">Заказы</th>
+          <th data-k="ordRevenue">Выручка</th>
           <th data-k="spend">Расход рекл.</th>
           <th data-k="views">Показы</th>
           <th data-k="clicks">Клики</th>
@@ -787,9 +788,9 @@ function renderTable(rows){
     const map = {};
     for(const r of rows){
       const k = r.date+"|"+r.artL;
-      if(!map[k]) map[k]={...r,orders:0,spend:0,views:0,clicks:0,profitBefore:0,profitAfter:0};
-      map[k].orders+=r.orders; map[k].spend+=r.spend;
-      map[k].views+=r.views; map[k].clicks+=r.clicks;
+      if(!map[k]) map[k]={...r,orders:0,ordRevenue:0,spend:0,views:0,clicks:0,profitBefore:0,profitAfter:0};
+      map[k].orders+=r.orders; map[k].ordRevenue+=(r.ordRevenue||0);
+      map[k].spend+=r.spend; map[k].views+=r.views; map[k].clicks+=r.clicks;
       map[k].profitBefore+=r.profitBefore; map[k].profitAfter+=r.profitAfter;
     }
     displayRows=Object.values(map).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(a.article<b.article?-1:1));
@@ -806,6 +807,7 @@ function renderTable(rows){
       <td class="l art-cell">${esc(r.article)}</td>
       ${sizeCell}
       <td>${fmt.format(r.orders)}</td>
+      <td>${r.ordRevenue?money(r.ordRevenue):'<span class="zero">0 ₽</span>'}</td>
       <td>${r.spend?money(r.spend):'<span class="zero">0 ₽</span>'}</td>
       <td>${r.views?fmt.format(Math.round(r.views)):'<span class="zero">0</span>'}</td>
       <td>${r.clicks?fmt.format(Math.round(r.clicks)):'<span class="zero">0</span>'}</td>
@@ -816,12 +818,12 @@ function renderTable(rows){
       <td class="${paCls}">${money(pa)}</td>
     </tr>`;
   }).join("");
-  const sum = displayRows.reduce((a,r)=>{ a.o+=r.orders;a.s+=r.spend;a.v+=r.views;a.c+=r.clicks;a.pb+=r.profitBefore;a.pa+=r.profitAfter; return a; },{o:0,s:0,v:0,c:0,pb:0,pa:0});
+  const sum = displayRows.reduce((a,r)=>{ a.o+=r.orders;a.rv+=(r.ordRevenue||0);a.s+=r.spend;a.v+=r.views;a.c+=r.clicks;a.pb+=r.profitBefore;a.pa+=r.profitAfter; return a; },{o:0,rv:0,s:0,v:0,c:0,pb:0,pa:0});
   const colspan = groupByArticle ? 2 : 3;
   const extraCols = groupByArticle ? "" : "<td></td><td></td>";
   $("#tfoot").innerHTML = `<tr>
     <td class="l" colspan="${colspan}">Итого · ${displayRows.length} строк</td>
-    <td>${fmt.format(sum.o)}</td><td>${money(sum.s)}</td>
+    <td>${fmt.format(sum.o)}</td><td>${money(sum.rv)}</td><td>${money(sum.s)}</td>
     <td>${fmt.format(Math.round(sum.v))}</td><td>${fmt.format(Math.round(sum.c))}</td>
     <td>${pct(sum.v?sum.c/sum.v*100:0)}</td><td></td>
     ${extraCols}
