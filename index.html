@@ -370,17 +370,19 @@ function initDates(){
 
 /* ---------- networking ---------- */
 function proxyUrl(target){ return state.proxy.replace(/\/+$/,"") + "/" + target; }
-async function wb(target, {method="GET", body=null, _retries=3}={}){
+async function wb(target, {method="GET", body=null}={}){
   const headers = {};
   const t = state.token.trim();
-  if(t) headers["Authorization"] = t;            // WB принимает «голый» токен
+  if(t) headers["Authorization"] = t;
   if(body) headers["Content-Type"]="application/json";
   const res = await fetch(proxyUrl(target), { method, headers, body: body?JSON.stringify(body):undefined });
   if(res.status===429){
-    if(_retries<=0) throw new Error("429 — rate limit. Подождите 1–2 минуты и попробуйте снова.");
-    const wait = Math.min(65, 20 * (4-_retries));  // 20с, 40с, 60с
+    // Бесконечный retry — как в рабочем дашборде; читаем заголовок Retry-After / X-Ratelimit-Retry
+    const hdr = res.headers.get('Retry-After') || res.headers.get('X-Ratelimit-Retry');
+    const wait = hdr ? Math.min(parseInt(hdr,10)||20, 120) : 20;
+    addLog(`429 — жду ${wait}с и повторяю...`,'warn');
     await sleep(wait * 1000);
-    return wb(target, {method, body, _retries: _retries-1});
+    return wb(target, {method, body});  // рекурсивный retry без лимита
   }
   const text = await res.text();
   if(!res.ok){
@@ -433,8 +435,8 @@ async function runPipeline(){
   const count = await wb(WB_ADV + "/adv/v1/promotion/count");
   if(count && Array.isArray(count.adverts)){
     for(const grp of count.adverts){
-      // статусы, по которым доступна статистика: 7 (завершена), 9 (активна), 11 (пауза)
-      if(grp.status!=null && ![7,9,11].includes(grp.status)) continue;
+      // только Активна (9) и На паузе (11) — без завершённых (7), которых могут быть сотни
+      if(grp.status!=null && ![9,11].includes(grp.status)) continue;
       const list = grp.advert_list || grp.advertList || [];
       for(const a of list) if(a.advertId!=null) advIds.push(a.advertId);
     }
