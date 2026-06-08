@@ -557,7 +557,7 @@ async function loadSheet(){
   catch(e){ throw new Error("Не удалось прочитать Google-таблицу — проверьте, что она опубликована (Файл → Поделиться → Опубликовать в интернете → CSV/TSV). " + e.message); }
   return parseTable(text);
 }
-function sizeNorm(s){ return norm(s).toLowerCase().replace(/[\s\-_./]+/g,""); }
+function sizeNorm(s){ return norm(s).toLowerCase(); }
 function parseTable(text){
   const firstLine = text.split("\n")[0]||"";
   const delim = firstLine.indexOf("\t")>=0 ? "\t" : ",";
@@ -630,7 +630,8 @@ function combine(adByArtDate, ordByKey, sizesByArtDate, cost){
   for(const sk of sizesByArtDate.keys()) pairs.add(sk);
 
   const CAMPAIGN_RENAME = {
-    "Боди аукцион": "Bod.SK.black.01",
+    "боди": "Bod.SK.black.01",
+    "боди аукцион": "Bod.SK.black.01",
   };
   function renameCampaign(name){ const k=(name||"").trim().toLowerCase(); return CAMPAIGN_RENAME[k]||name; }
 
@@ -791,7 +792,7 @@ function renderTable(rows){
     const paCls = pa>0?"posv":(pa<0?"neg":"zero");
     const noCost = !r.hasCost ? ` <span class="flagless" title="Нет себестоимости в таблице">●</span>` : "";
     const sizeCell = groupByArticle ? "" : `<td class="l">${esc(r.size)}${r.excluded?' <span class="flagless" title="Исключён из распределения">∅</span>':''}</td>`;
-    const buyoutCell = groupByArticle ? "" : `<td>${pct(r.buyout*100)}</td><td>${r.profitUnit?money(r.profitUnit):'<span class="zero">—</span>'}${noCost}</td>`;
+    const buyoutCell = groupByArticle ? "" : `<td>${Math.round(r.buyout*100)}%</td><td>${r.profitUnit?money(r.profitUnit):'<span class="zero">—</span>'}${noCost}</td>`;
     return `<tr>
       <td class="l">${fmtDate(r.date)}</td>
       <td class="l art-cell">${esc(r.article)}</td>
