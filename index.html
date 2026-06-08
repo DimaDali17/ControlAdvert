@@ -507,7 +507,7 @@ async function runPipeline(){
   /* 4. real orders */
   stepNow(3);
   const ordersRaw = await wb(WB_STAT + `/api/v1/supplier/orders?dateFrom=${state.from}T00:00:00&flag=0`);
-  const ordByKey = new Map();          // "date|artLower|size" -> {date,article,size,count}
+  const ordByKey = new Map();          // "date|artLower|size" -> {date,article,size,count,revenue}
   const sizesByArtDate = new Map();    // "artLower|date" -> Set(size)
   if(Array.isArray(ordersRaw)){
     for(const o of ordersRaw){
@@ -517,8 +517,10 @@ async function runPipeline(){
       const art = norm(o.supplierArticle);
       const size = norm(o.techSize) || "—";
       const k = date+"|"+keyArt(art)+"|"+size;
-      const cur = ordByKey.get(k) || {date, article:art, size, count:0};
-      cur.count++; ordByKey.set(k,cur);
+      const cur = ordByKey.get(k) || {date, article:art, size, count:0, revenue:0};
+      cur.count++;
+      cur.revenue += (parseFloat(o.finishedPrice)||parseFloat(o.totalPrice)||0);
+      ordByKey.set(k,cur);
       const sk = keyArt(art)+"|"+date;
       if(!sizesByArtDate.has(sk)) sizesByArtDate.set(sk,new Set());
       sizesByArtDate.get(sk).add(size);
@@ -616,80 +618,76 @@ function exclusionSet(){
 }
 function combine(adByArtDate, ordByKey, sizesByArtDate, cost){
   const excl = exclusionSet();
-  // прибыль/выкупаемость: сначала ищем особый размер (артикул;размер), затем артикул целиком
+  const CAMPAIGN_RENAME = {"боди":"Bod.SK.black.01","боди аукцион":"Bod.SK.black.01"};
+  function renameCampaign(name){ const k=(name||"").trim().toLowerCase(); return CAMPAIGN_RENAME[k]||name; }
+  function artLNorm(raw){ return keyArt(renameCampaign(raw)); }
   const sizeRec = (artL,size) => (cost && cost.bySize[artL] && cost.bySize[artL][sizeNorm(size)]) || null;
   const artRec  = artL => (cost && cost.byArt[artL]) || null;
-  const profitOf  = (artL,size) => { const sr=sizeRec(artL,size); if(sr) return sr.profit||0; const ar=artRec(artL); return ar?(ar.profit||0):0; };
-  const revenueOf = (artL,size) => { const sr=sizeRec(artL,size); if(sr&&sr.revenue!=null) return sr.revenue; const ar=artRec(artL); return ar&&ar.revenue!=null?ar.revenue:profitOf(artL,size); };
-  const buyoutOf  = (artL,size) => { const sr=sizeRec(artL,size); if(sr&&sr.buyout!=null) return sr.buyout; const ar=artRec(artL); if(ar&&ar.buyout!=null) return ar.buyout; return state.buyout/100; };
+  const profitOf = (artL,size) => { const sr=sizeRec(artL,size); if(sr) return sr.profit||0; const ar=artRec(artL); return ar?(ar.profit||0):0; };
+  const buyoutOf = (artL,size) => { const sr=sizeRec(artL,size); if(sr&&sr.buyout!=null) return sr.buyout; const ar=artRec(artL); if(ar&&ar.buyout!=null) return ar.buyout; return state.buyout/100; };
   const hasCost  = (artL,size) => !!(sizeRec(artL,size) || artRec(artL));
 
-  // union of (art,date) pairs from ads + orders
-  const pairs = new Set();
-  for(const k of adByArtDate.keys()) pairs.add(k);
-  for(const sk of sizesByArtDate.keys()) pairs.add(sk);
+  // Merge adByArtDate by normalised artL (fixes "Боди" + "Боди аукцион" → same key)
+  const adMerged = new Map();
+  for(const [pk, adm] of adByArtDate){
+    const sep=pk.indexOf("|"); const rawArtL=pk.slice(0,sep), date=pk.slice(sep+1);
+    const nk=artLNorm(rawArtL)+"|"+date;
+    const cur=adMerged.get(nk)||{article:renameCampaign(adm.article||rawArtL),views:0,clicks:0,adOrders:0,spend:0};
+    cur.views+=adm.views||0; cur.clicks+=adm.clicks||0; cur.adOrders+=adm.adOrders||0; cur.spend+=adm.spend||0;
+    adMerged.set(nk,cur);
+  }
+  const sizesNorm = new Map();
+  for(const [sk, sset] of sizesByArtDate){
+    const sep=sk.indexOf("|"); const rawArtL=sk.slice(0,sep), date=sk.slice(sep+1);
+    const nk=artLNorm(rawArtL)+"|"+date;
+    if(!sizesNorm.has(nk)) sizesNorm.set(nk,new Set());
+    for(const s of sset) sizesNorm.get(nk).add(s);
+  }
+  // ordByKey rebuild with normalised artL; original key = "date|rawArtL|size"
+  const ordNorm = new Map();
+  for(const [ok, ord] of ordByKey){
+    const p0=ok.indexOf("|"), p1=ok.indexOf("|",p0+1);
+    const date=ok.slice(0,p0), rawArtL=ok.slice(p0+1,p1), size=ok.slice(p1+1);
+    const nk=date+"|"+artLNorm(rawArtL)+"|"+size;
+    const cur=ordNorm.get(nk)||{count:0,revenue:0};
+    cur.count+=ord.count; cur.revenue+=ord.revenue||0;
+    ordNorm.set(nk,cur);
+  }
 
-  const CAMPAIGN_RENAME = {
-    "боди": "Bod.SK.black.01",
-    "боди аукцион": "Bod.SK.black.01",
-  };
-  function renameCampaign(name){ const k=(name||"").trim().toLowerCase(); return CAMPAIGN_RENAME[k]||name; }
-
+  const pairs = new Set([...adMerged.keys(),...sizesNorm.keys()]);
   const rows = [];
   for(const pk of pairs){
-    const [artL, date] = pk.split("|");
-    const adm = adByArtDate.get(pk) || {article:null,views:0,clicks:0,adOrders:0,spend:0};
-    const sizesSet = sizesByArtDate.get(pk) || new Set();
-    const sizes = [...sizesSet];
-    // article display name: prefer order's, else ad's; apply rename
-    let artName = adm.article;
-    if(sizes.length){ const anyKey=[...ordByKey.keys()].find(k=>k.startsWith(date+"|"+artL+"|")); if(anyKey) artName = ordByKey.get(anyKey).article; }
-    artName = renameCampaign(artName || artL);
-
-    const exSet = excl.get(artL) || new Set();
-    const eligible = sizes.filter(s=>!exSet.has(sizeNorm(s)));
-    const n = eligible.length;
-    const spend   = adm.spend||0;
-    const views   = adm.views||0;
-    const clicks  = adm.clicks||0;
-    const perSize   = n ? spend  / n : 0;
-    const perViews  = n ? views  / n : 0;
-    const perClicks = n ? clicks / n : 0;
-    // CTR и CR считаем на уровне артикула (одинаковы для всех размеров)
-    const ctr = views ? clicks/views*100 : 0;
-    const cr  = (adm.clicks||0) ? adm.adOrders/adm.clicks*100 : 0;
-
+    const sep=pk.indexOf("|"); const artL=pk.slice(0,sep), date=pk.slice(sep+1);
+    const adm=adMerged.get(pk)||{article:artL,views:0,clicks:0,adOrders:0,spend:0};
+    const sizes=[...(sizesNorm.get(pk)||new Set())];
+    const artName=renameCampaign(adm.article||artL);
+    const exSet=excl.get(artL)||new Set();
+    const eligible=sizes.filter(s=>!exSet.has(sizeNorm(s)));
+    const n=eligible.length;
+    const spend=adm.spend||0, views=adm.views||0, clicks=adm.clicks||0;
+    const perSpend=n?spend/n:0, perViews=n?views/n:0, perClicks=n?clicks/n:0;
+    const ctr=views?clicks/views*100:0, cr=clicks?adm.adOrders/clicks*100:0;
     if(!sizes.length){
-      if(spend>0 || views>0){
-        rows.push(mkRow(date,artName,artL,"—",0,spend,views,clicks,ctr,cr,profitOf,revenueOf,buyoutOf,hasCost,false));
-      }
+      if(spend>0||views>0) rows.push(mkRow(date,artName,artL,"—",0,0,spend,views,clicks,ctr,cr,profitOf,buyoutOf,hasCost,false));
       continue;
     }
     for(const s of sizes){
-      const cnt   = (ordByKey.get(date+"|"+artL+"|"+s)||{count:0}).count;
-      const isEx  = exSet.has(sizeNorm(s));
-      const sSpend  = (isEx || n===0) ? 0 : perSize;
-      const sViews  = (isEx || n===0) ? 0 : perViews;
-      const sClicks = (isEx || n===0) ? 0 : perClicks;
-      rows.push(mkRow(date,artName,artL,s,cnt,sSpend,sViews,sClicks,ctr,cr,profitOf,revenueOf,buyoutOf,hasCost,isEx));
+      const ord=ordNorm.get(date+"|"+artL+"|"+s)||{count:0,revenue:0};
+      const isEx=exSet.has(sizeNorm(s));
+      rows.push(mkRow(date,artName,artL,s,ord.count,ord.revenue,
+        isEx||n===0?0:perSpend, isEx||n===0?0:perViews, isEx||n===0?0:perClicks,
+        ctr,cr,profitOf,buyoutOf,hasCost,isEx));
     }
-    if(n===0 && spend>0){
-      rows.push(mkRow(date,artName,artL,"(не распределено)",0,spend,0,0,ctr,cr,profitOf,revenueOf,buyoutOf,hasCost,false));
-    }
+    if(n===0&&spend>0) rows.push(mkRow(date,artName,artL,"(не распределено)",0,0,spend,0,0,ctr,cr,profitOf,buyoutOf,hasCost,false));
   }
-  rows.sort((a,b)=> a.date<b.date?-1:a.date>b.date?1:(a.article<b.article?-1:a.article>b.article?1:(a.size<b.size?-1:1)));
-  return { rows, adByArtDate };
+  rows.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(a.article<b.article?-1:a.article>b.article?1:(a.size<b.size?-1:1)));
+  return { rows, adMerged };
 }
-function mkRow(date,article,artL,size,orders,spend,views,clicks,ctr,cr,profitOf,revenueOf,buyoutOf,hasCost,excluded){
-  const pu = profitOf(artL,size), bo = buyoutOf(artL,size), ru = revenueOf(artL,size);
-  const profitBefore = orders * bo * pu;
-  const profitAfter  = profitBefore - spend;
-  return {
-    date, article, artL, size, orders,
-    spend, views, clicks, ctr, cr,
-    profitBefore, profitAfter, buyout:bo, profitUnit:pu, revenueUnit:ru,
-    hasCost:hasCost(artL,size), excluded
-  };
+function mkRow(date,article,artL,size,orders,ordRevenue,spend,views,clicks,ctr,cr,profitOf,buyoutOf,hasCost,excluded){
+  const pu=profitOf(artL,size), bo=buyoutOf(artL,size);
+  const profitBefore=orders*bo*pu, profitAfter=profitBefore-spend;
+  return { date,article,artL,size,orders,ordRevenue,spend,views,clicks,ctr,cr,
+    profitBefore,profitAfter,buyout:bo,profitUnit:pu,hasCost:hasCost(artL,size),excluded };
 }
 
 /* =======================================================================
@@ -714,15 +712,16 @@ function filteredRows(){
     (!f.art||r.article===f.art) &&
     r.date>=f.from && r.date<=f.to);
 }
-// ad-level rows (для показов/кликов/CTR/CR — без учёта фильтра размера)
+// ad-level rows (для adOrders/CR — данные кампаний)
 function filteredAd(){
   const f = currentFilter();
   const out = [];
   const fa = f.art ? keyArt(f.art) : "";
-  for(const v of state.computed.adByArtDate.values()){
-    if(fa && keyArt(v.article)!==fa) continue;
-    if(v.date<f.from||v.date>f.to) continue;
-    out.push(v);
+  for(const [pk, v] of state.computed.adMerged){
+    const sep=pk.indexOf("|"); const artL=pk.slice(0,sep), date=pk.slice(sep+1);
+    if(fa && artL!==fa && keyArt(v.article||"")!==fa) continue;
+    if(date<f.from||date>f.to) continue;
+    out.push({...v, date});
   }
   return out;
 }
@@ -736,18 +735,18 @@ function render(){
 }
 
 function renderKpis(rows, ad){
-  const orders = rows.reduce((s,r)=>s+r.orders,0);
-  const spend = rows.reduce((s,r)=>s+r.spend,0);
-  const pB = rows.reduce((s,r)=>s+r.profitBefore,0);
-  const pA = rows.reduce((s,r)=>s+r.profitAfter,0);
-  const revenue = rows.reduce((s,r)=>s+(r.orders * r.buyout * (r.revenueUnit||r.profitUnit||0)),0);
-  const views  = rows.reduce((s,r)=>s+r.views,0);
-  const clicks = rows.reduce((s,r)=>s+r.clicks,0);
+  const orders  = rows.reduce((s,r)=>s+r.orders,0);
+  const spend   = rows.reduce((s,r)=>s+r.spend,0);
+  const pB      = rows.reduce((s,r)=>s+r.profitBefore,0);
+  const pA      = rows.reduce((s,r)=>s+r.profitAfter,0);
+  const revenue = rows.reduce((s,r)=>s+(r.ordRevenue||0),0);
+  const views   = rows.reduce((s,r)=>s+r.views,0);
+  const clicks  = rows.reduce((s,r)=>s+r.clicks,0);
   const ctr = views?clicks/views*100:0;
-  const adOrders = ad.reduce((s,r)=>s+r.adOrders,0);
+  const adOrders = ad.reduce((s,r)=>s+(r.adOrders||0),0);
   const cr = clicks?adOrders/clicks*100:0;
-  const drrProfit = pB>0 ? spend/pB*100 : 0;
-  const drrRevenue = revenue>0 ? spend/revenue*100 : 0;
+  const drrP = pB>0      ? spend/pB*100      : null;
+  const drrR = revenue>0 ? spend/revenue*100 : null;
   const m = state.computed.meta;
   const k = [
     ["Заказы (реальные)", fmt.format(orders), `${m.ordersTotal} в выгрузке`, ""],
@@ -755,12 +754,13 @@ function renderKpis(rows, ad){
     ["Прибыль до рекламы", money(pB), "с учётом выкупаемости", ""],
     ["Прибыль после рекламы", money(pA), pA>=0?"реклама окупается":"реклама в минус", "profit"],
     ["CTR / CR", pct(ctr)+" / "+pct(cr), `${fmt.format(Math.round(views))} показов`, ""],
-    ["ДРР по прибыли", pB>0?pct(drrProfit):"—", "расход ÷ прибыль до", "accent"],
-    ["ДРР по выручке", revenue>0?pct(drrRevenue):"—", "расход ÷ выручка", "accent"],
+    ["ДРР: прибыль / выручка",
+      (drrP!=null?pct(drrP):"—") + " / " + (drrR!=null?pct(drrR):"—"),
+      "расход ÷ прибыль до · расход ÷ выручка WB", "accent"],
   ];
   $("#kpis").innerHTML = k.map(([l,v,s,cls])=>`
     <div class="kpi ${cls}"><div class="bar"></div>
-      <div class="k-l">${l}</div><div class="k-v">${v}</div><div class="k-s">${s}</div></div>`).join("");
+      <div class="k-l">${l}</div><div class="k-v" style="font-size:${cls?'22px':'26px'}">${v}</div><div class="k-s">${s}</div></div>`).join("");
 }
 
 function renderTable(rows){
@@ -861,12 +861,15 @@ function renderCharts(rows, ad){
 
 /* ---------- table sorting ---------- */
 let sortK=null, sortDir=1;
-document.querySelectorAll("#tbl thead th").forEach(th=>th.addEventListener("click",()=>{
-  const k=th.dataset.k; if(sortK===k) sortDir*=-1; else {sortK=k;sortDir=1;}
+document.addEventListener("click", e=>{
+  const th = e.target.closest("#tbl thead th");
+  if(!th || th.style.display==="none") return;
+  const k=th.dataset.k; if(!k) return;
+  if(sortK===k) sortDir*=-1; else {sortK=k;sortDir=1;}
   const rows=filteredRows().sort((a,b)=>{ let x=a[k],y=b[k];
-    if(typeof x==="string"){return x<y?-sortDir:x>y?sortDir:0;} return (x-y)*sortDir; });
+    if(typeof x==="string"){return x<y?-sortDir:x>y?sortDir:0;} return ((x||0)-(y||0))*sortDir; });
   renderTable(rows);
-}));
+});
 
 function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
