@@ -453,7 +453,7 @@ async function runPipeline(){
         if(id != null && nm) nameById[id] = nm;
       }
     }catch(e){ /* имена для части пачки могли не прийти — продолжаем */ }
-    await sleep(150);
+    await sleep(500);
   }
 
   // article -> [advertId]; advertId -> article (article = campaign name)
@@ -463,14 +463,14 @@ async function runPipeline(){
     throw new Error("Не удалось получить названия кампаний через /api/advert/v2/adverts — связать рекламу с артикулами невозможно. Проверьте доступ токена к категории «Продвижение».");
   }
 
-  /* 3. ad fullstats (max 31 days, max ~100 IDs per request, retry via wb()) */
+  /* 3. ad fullstats (max 31 days, max 50 IDs per request, retry via wb()) */
   stepNow(2);
   const adByArtDate = new Map();   // "art|date" -> {views,clicks,adOrders,spend}
   const begin = state.from, end = state.to;
-  const fsChunks = chunk(advIds, 100);
+  const fsChunks = chunk(advIds, 50);
   for(let ci=0; ci<fsChunks.length; ci++){
     const part = fsChunks[ci];
-    if(ci>0) await sleep(2000);  // 2 секунды между пачками — не раздражать rate limiter
+    if(ci>0) await sleep(3000);  // 3 секунды между пачками
     let stats;
     try{
       stats = await wb(WB_ADV + `/adv/v3/fullstats?ids=${part.join(",")}&beginDate=${begin}&endDate=${end}`);
