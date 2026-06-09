@@ -113,52 +113,54 @@ pre{background:#2a241d;color:#e8e0d0;border-radius:14px;padding:16px;overflow:au
 .modal-x{float:right;border:none;background:var(--line);width:34px;height:34px;border-radius:10px;font-size:18px;color:var(--ink2)}
 
 /* ---------- dashboard ---------- */
-#dash{padding:26px clamp(16px,4vw,46px) 60px;max-width:1500px;margin:0 auto}
-.topbar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:22px}
-.topbar .logo{width:50px;height:50px;border-radius:14px}
-.topbar .logo span{font-size:20px}
-.topbar h1{font-family:'Comfortaa';font-size:24px;margin:0;font-weight:700}
-.topbar .sub{font-size:10.5px;letter-spacing:.16em;color:var(--muted);font-weight:700;text-transform:uppercase}
+#dash{padding:20px clamp(12px,3vw,36px) 48px;max-width:1600px;margin:0 auto}
+.topbar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.topbar .logo{width:44px;height:44px;border-radius:12px}
+.topbar .logo span{font-size:18px}
+.topbar h1{font-family:'Comfortaa';font-size:22px;margin:0;font-weight:700}
+.topbar .sub{font-size:10px;letter-spacing:.16em;color:var(--muted);font-weight:700;text-transform:uppercase}
 .topbar .spacer{flex:1}
-.period-chip{background:var(--card);border:1px solid var(--line2);border-radius:12px;padding:9px 15px;font-size:13px;font-weight:600;color:var(--ink2);box-shadow:var(--shadow-s)}
+.period-chip{background:var(--card);border:1px solid var(--line2);border-radius:10px;padding:7px 13px;font-size:12px;font-weight:600;color:var(--ink2);box-shadow:var(--shadow-s);white-space:nowrap}
 
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:22px}
-.kpi{background:var(--card);border-radius:18px;padding:18px 20px;box-shadow:var(--shadow-s);border:1px solid rgba(255,255,255,.6);position:relative;overflow:hidden}
-.kpi .k-l{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
-.kpi .k-v{font-size:26px;font-weight:800;margin-top:8px;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
-.kpi .k-s{font-size:12px;color:var(--muted);margin-top:3px;font-weight:600}
+.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:18px}
+@media(max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:640px){.kpis{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:var(--card);border-radius:14px;padding:13px 15px 12px;box-shadow:var(--shadow-s);border:1px solid rgba(255,255,255,.6);position:relative;overflow:hidden;min-width:0}
+.kpi .k-l{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi .k-v{font-size:20px;font-weight:800;margin-top:5px;letter-spacing:-.3px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi .k-s{font-size:11px;color:var(--muted);margin-top:2px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .kpi.accent .k-v{color:var(--terra)}
 .kpi.pos .k-v{color:var(--sage)}
-.kpi .bar{position:absolute;left:0;top:0;bottom:0;width:5px}
+.kpi .bar{position:absolute;left:0;top:0;bottom:0;width:4px}
 .kpi.accent .bar{background:var(--terra)} .kpi.pos .bar{background:var(--sage)}
 .kpi.profit .bar{background:var(--teal)} .kpi.profit .k-v{color:var(--teal)}
 
-.panel{background:var(--card);border-radius:20px;padding:22px 24px;box-shadow:var(--shadow-s);border:1px solid rgba(255,255,255,.6);margin-bottom:20px}
-.panel h3{font-family:'Comfortaa';font-size:17px;margin:0 0 16px;font-weight:600}
-.filters{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end}
-.filters .fgrp{display:flex;flex-direction:column;gap:6px}
+.panel{background:var(--card);border-radius:18px;padding:18px 20px;box-shadow:var(--shadow-s);border:1px solid rgba(255,255,255,.6);margin-bottom:16px}
+.panel h3{font-family:'Comfortaa';font-size:16px;margin:0 0 13px;font-weight:600}
+.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.filters .fgrp{display:flex;flex-direction:column;gap:5px}
 .filters .fgrp .label{margin:0}
-.filters select,.filters input{min-width:150px}
-.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:18px}
-.chartbox{background:var(--card2);border:1px solid var(--line);border-radius:16px;padding:16px 16px 8px}
-.chartbox .ct{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
-.chartwrap{position:relative;height:210px}
+.filters select,.filters input{min-width:130px}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.chartbox{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:13px 13px 6px}
+.chartbox .ct{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.chartwrap{position:relative;height:190px}
 
-.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:14px;max-height:560px}
-table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
-thead th{position:sticky;top:0;background:#f1ece2;color:var(--ink2);font-weight:700;font-size:11px;letter-spacing:.05em;
-  text-transform:uppercase;text-align:right;padding:11px 12px;white-space:nowrap;cursor:pointer;border-bottom:2px solid var(--line2);z-index:2}
+.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:12px;max-height:520px}
+table{border-collapse:collapse;width:100%;font-size:11.5px;font-variant-numeric:tabular-nums}
+thead th{position:sticky;top:0;background:#f1ece2;color:var(--ink2);font-weight:700;font-size:10px;letter-spacing:.04em;
+  text-transform:uppercase;text-align:right;padding:8px 9px;white-space:nowrap;cursor:pointer;border-bottom:2px solid var(--line2);z-index:2;user-select:none}
 thead th.l{text-align:left}
 thead th:hover{color:var(--gold2)}
-tbody td{padding:9px 12px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
-tbody td.l{text-align:left}
+tbody td{padding:6px 9px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap;font-size:11.5px}
+tbody td.l{text-align:left;max-width:160px;overflow:hidden;text-overflow:ellipsis}
 tbody tr:hover{background:#f6f1e8}
 .art-cell{font-weight:700;color:var(--ink)}
 .neg{color:var(--rust);font-weight:700}
 .posv{color:var(--sage);font-weight:700}
 .zero{color:var(--faint)}
-.flagless{color:var(--gold2);font-size:11px}
-tfoot td{position:sticky;bottom:0;background:#efe8dc;font-weight:800;padding:12px;border-top:2px solid var(--line2);text-align:right}
+.flagless{color:var(--gold2);font-size:10px}
+tfoot td{position:sticky;bottom:0;background:#ede6d9;font-weight:800;padding:8px 9px;border-top:2px solid var(--line2);text-align:right;font-size:11.5px;white-space:nowrap}
 tfoot td.l{text-align:left}
 
 /* ---------- loader ---------- */
@@ -284,7 +286,7 @@ tfoot td.l{text-align:left}
     </div>
   </div>
 
-  <div class="panel">
+  <div class="panel" id="panelSum">
     <h3>Сводка по компаниям</h3>
     <div class="tablewrap">
       <table id="tblSum">
@@ -296,11 +298,10 @@ tfoot td.l{text-align:left}
           <th data-k="views">Показы</th>
           <th data-k="clicks">Клики</th>
           <th data-k="ctr">CTR</th>
-          <th data-k="cr">CR</th>
           <th data-k="profitBefore">Прибыль до рекл.</th>
           <th data-k="profitAfter">Прибыль после рекл.</th>
-          <th data-k="drrP">ДРР прибыль</th>
-          <th data-k="drrR">ДРР выручка</th>
+          <th data-k="drrP">ДРР/прибыль</th>
+          <th data-k="drrR">ДРР/выручка</th>
         </tr></thead>
         <tbody id="tbodySum"></tbody>
         <tfoot id="tfootSum"></tfoot>
@@ -728,7 +729,7 @@ function mkRow(date,article,artL,size,orders,ordRevenue,spend,views,clicks,ctr,c
    ======================================================================= */
 const fmt = new Intl.NumberFormat("ru-RU");
 const money = v => fmt.format(Math.round(v)) + " ₽";
-const pct = v => (v||0).toFixed(2).replace(".",",") + "%";
+const pct = v => (v||0).toFixed(1).replace(".",",") + "%";
 
 function buildFilters(){
   const arts = [...new Set(state.computed.rows.map(r=>r.article))].sort();
@@ -768,11 +769,17 @@ function render(){
   renderCharts(rows, ad);
 }
 
-function renderSummary(rows){
+function renderSummary(rows, sk, sd){
+  const totalSpend = rows.reduce((s,r)=>s+r.spend,0);
+  const sumPanel = document.getElementById("panelSum");
+  if(sumPanel) sumPanel.style.display = totalSpend>0 ? "" : "none";
+  if(!totalSpend) return;
+
+  sk = sk || "profitAfter"; sd = sd || -1;
   const map = {};
   for(const r of rows){
     const k = r.artL;
-    if(!map[k]) map[k]={article:r.article,orders:0,ordRevenue:0,spend:0,views:0,clicks:0,adOrders:0,profitBefore:0,profitAfter:0};
+    if(!map[k]) map[k]={article:r.article,orders:0,ordRevenue:0,spend:0,views:0,clicks:0,profitBefore:0,profitAfter:0};
     map[k].orders       += r.orders;
     map[k].ordRevenue   += r.ordRevenue||0;
     map[k].spend        += r.spend;
@@ -781,15 +788,21 @@ function renderSummary(rows){
     map[k].profitBefore += r.profitBefore;
     map[k].profitAfter  += r.profitAfter;
   }
-  const sumRows = Object.values(map).sort((a,b)=>b.profitAfter-a.profitAfter);
+  // вычисляем производные для сортировки
+  for(const r of Object.values(map)){
+    r.ctr  = r.views  ? r.clicks/r.views*100 : 0;
+    r.drrP = r.profitBefore>0 ? r.spend/r.profitBefore*100 : 0;
+    r.drrR = r.ordRevenue>0   ? r.spend/r.ordRevenue*100   : 0;
+  }
+  const sumRows = Object.values(map).sort((a,b)=>{
+    let x=a[sk], y=b[sk];
+    if(typeof x==="string") return x<y?-sd:x>y?sd:0;
+    return ((x||0)-(y||0))*sd;
+  });
   const tb = $("#tbodySum");
-  if(!sumRows.length){ tb.innerHTML=`<tr><td colspan="12" style="padding:20px;color:var(--muted)">Нет данных.</td></tr>`; $("#tfootSum").innerHTML=""; return; }
+  if(!sumRows.length){ tb.innerHTML=`<tr><td colspan="12" style="padding:16px;color:var(--muted)">Нет данных.</td></tr>`; $("#tfootSum").innerHTML=""; return; }
   tb.innerHTML = sumRows.map(r=>{
     const pa=r.profitAfter, paCls=pa>0?"posv":(pa<0?"neg":"zero");
-    const ctr=r.views?r.clicks/r.views*100:0;
-    const cr=r.clicks?0:0; // adOrders не суммируем на этом уровне
-    const drrP=r.profitBefore>0?r.spend/r.profitBefore*100:null;
-    const drrR=r.ordRevenue>0?r.spend/r.ordRevenue*100:null;
     return `<tr>
       <td class="l art-cell">${esc(r.article)}</td>
       <td>${fmt.format(r.orders)}</td>
@@ -797,12 +810,11 @@ function renderSummary(rows){
       <td>${r.spend?money(r.spend):'<span class="zero">0 ₽</span>'}</td>
       <td>${fmt.format(Math.round(r.views))}</td>
       <td>${fmt.format(Math.round(r.clicks))}</td>
-      <td>${pct(ctr)}</td>
-      <td>—</td>
+      <td>${pct(r.ctr)}</td>
       <td>${money(r.profitBefore)}</td>
       <td class="${paCls}">${money(pa)}</td>
-      <td>${drrP!=null?pct(drrP):'<span class="zero">—</span>'}</td>
-      <td>${drrR!=null?pct(drrR):'<span class="zero">—</span>'}</td>
+      <td>${r.profitBefore>0?pct(r.drrP):'<span class="zero">—</span>'}</td>
+      <td>${r.ordRevenue>0?pct(r.drrR):'<span class="zero">—</span>'}</td>
     </tr>`;
   }).join("");
   const s = sumRows.reduce((a,r)=>{ a.o+=r.orders;a.rv+=r.ordRevenue;a.sp+=r.spend;a.v+=r.views;a.c+=r.clicks;a.pb+=r.profitBefore;a.pa+=r.profitAfter; return a; },{o:0,rv:0,sp:0,v:0,c:0,pb:0,pa:0});
@@ -811,7 +823,7 @@ function renderSummary(rows){
     <td class="l">Итого · ${sumRows.length} компаний</td>
     <td>${fmt.format(s.o)}</td><td>${money(s.rv)}</td><td>${money(s.sp)}</td>
     <td>${fmt.format(Math.round(s.v))}</td><td>${fmt.format(Math.round(s.c))}</td>
-    <td>${pct(s.v?s.c/s.v*100:0)}</td><td></td>
+    <td>${pct(s.v?s.c/s.v*100:0)}</td>
     <td>${money(s.pb)}</td>
     <td class="${s.pa>=0?'posv':'neg'}">${money(s.pa)}</td>
     <td>${drrPT!=null?pct(drrPT):'—'}</td>
@@ -942,19 +954,31 @@ function renderCharts(rows, ad){
     data:{labels:lbl,datasets:[
       {label:'CTR, %',data:d.ctr,borderColor:C.gold,backgroundColor:C.gold,tension:.35,pointRadius:2},
       {label:'CR, %',data:d.cr,borderColor:C.rust,backgroundColor:C.rust,tension:.35,pointRadius:2}]},
-    options:baseOpts({ y:{grid:{color:C.line},ticks:{font:{family:'Manrope',size:10},color:'#9b9184',callback:v=>v+'%'}}}) });
+    options:baseOpts({ y:{grid:{color:C.line},ticks:{font:{family:'Manrope',size:10},color:'#9b9184',callback:v=>v.toFixed(1)+'%'},
+      max: Math.min(100, Math.max(...d.ctr,...d.cr)*1.3 || 20)}}) });
 }
 
 /* ---------- table sorting ---------- */
 let sortK=null, sortDir=1;
+let sortSumK=null, sortSumDir=1;
 document.addEventListener("click", e=>{
+  // detail table
   const th = e.target.closest("#tbl thead th");
-  if(!th || th.style.display==="none") return;
-  const k=th.dataset.k; if(!k) return;
-  if(sortK===k) sortDir*=-1; else {sortK=k;sortDir=1;}
-  const rows=filteredRows().sort((a,b)=>{ let x=a[k],y=b[k];
-    if(typeof x==="string"){return x<y?-sortDir:x>y?sortDir:0;} return ((x||0)-(y||0))*sortDir; });
-  renderTable(rows);
+  if(th && th.style.display!=="none"){
+    const k=th.dataset.k; if(!k) return;
+    if(sortK===k) sortDir*=-1; else {sortK=k;sortDir=1;}
+    const rows=filteredRows().sort((a,b)=>{ let x=a[k],y=b[k];
+      if(typeof x==="string"){return x<y?-sortDir:x>y?sortDir:0;} return ((x||0)-(y||0))*sortDir; });
+    renderTable(rows);
+    return;
+  }
+  // summary table
+  const ths = e.target.closest("#tblSum thead th");
+  if(ths){
+    const k=ths.dataset.k; if(!k) return;
+    if(sortSumK===k) sortSumDir*=-1; else {sortSumK=k;sortSumDir=1;}
+    renderSummary(filteredRows(), k, sortSumDir);
+  }
 });
 
 function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
