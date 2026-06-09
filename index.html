@@ -794,7 +794,7 @@ function renderSummary(rows, sk, sd){
     r.drrP = r.profitBefore>0 ? r.spend/r.profitBefore*100 : 0;
     r.drrR = r.ordRevenue>0   ? r.spend/r.ordRevenue*100   : 0;
   }
-  const sumRows = Object.values(map).sort((a,b)=>{
+  const sumRows = Object.values(map).filter(r=>r.spend>0).sort((a,b)=>{
     let x=a[sk], y=b[sk];
     if(typeof x==="string") return x<y?-sd:x>y?sd:0;
     return ((x||0)-(y||0))*sd;
